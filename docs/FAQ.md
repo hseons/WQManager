@@ -48,8 +48,8 @@ offline content, so a quick backup is not automatically "cache-free".
 
 ### Can I restore a backup to a different app?
 
-No. Restore is deliberately restricted to the same Bundle ID, same app installed
-on the same device. Cross-app transplantation is not implemented.
+No. Restore writes back to the same app (same Bundle ID) on the same device.
+Copying data into a different app is not supported.
 
 ### Can I move a backup to another device?
 

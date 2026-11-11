@@ -80,8 +80,7 @@ Everything is local. No account, no analytics, no cloud.
 
 ### Restore
 
-- Same-bundle-ID restore only (cross-app replacement is intentionally not
-  implemented).
+- Restores always target the same app (same Bundle ID).
 - Target app must be installed, closed, accessible and identity-verified.
 - Automatic safety backup before writing.
 - Recovery journal, post-write hash verification, immediate rollback on
@@ -131,9 +130,9 @@ CoreType icons. WQManager therefore:
    Lookup API by bundle ID;
 4. otherwise shows a letter tile.
 
-This is why an app installed from a third-party signing service (no App Store
-ID) may still show a letter tile: there is no legal local source and no public
-artwork to fetch. This is a platform limitation, not a missing feature.
+So an app installed through a third-party signing service (no App Store ID) can
+still show a letter tile: there is no local icon we are allowed to read and no
+public artwork to fetch.
 
 ## Requirements
 
@@ -232,15 +231,17 @@ package format, the restore state machine and the threat model.
 
 ## Limitations
 
-- **No jailbreak:** works through sandbox extensions, so it is limited to what
-  those extensions allow. System data, system groups, daemons and SpringBoard
-  caches are intentionally out of scope.
-- **Same-bundle-ID restore only.** Cross-app replacement is not implemented.
-- **Backups are not encrypted** by this app; rely on iOS file protection and
-  your own encrypted storage for exports that contain sensitive data.
-- **iOS 26+ only.** Older systems are not supported.
-- **Icons:** see [Icons on stock iOS](#icons-on-stock-ios).
-- The UI is optimized for iOS 26; behavior on future betas may change.
+- iOS 26 or later.
+- Without a jailbreak, WQManager reaches app data containers through sandbox
+  extensions only. System directories, other apps' bundles and SpringBoard
+  caches are out of reach.
+- Restore writes back to the same app (same Bundle ID). Copying data from one
+  app into another is not supported.
+- Backups are plain directories and are not encrypted. For sensitive data, rely
+  on iOS file protection or encrypt the archive yourself.
+- Third-party icons depend on system policy; see
+  [Icons on stock iOS](#icons-on-stock-ios).
+- The interface is designed for iOS 26; later releases may behave differently.
 
 ## Credits
 

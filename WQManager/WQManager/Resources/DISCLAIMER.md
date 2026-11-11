@@ -1,7 +1,7 @@
 # Disclaimer
 
-WQManager is experimental software that can read, copy, modify, replace, or
-delete application data. Use it at your own risk.
+WQManager is experimental software that reads, copies, modifies, and deletes
+application data. Use it at your own risk.
 
 You are responsible for:
 
@@ -10,10 +10,9 @@ You are responsible for:
 - closing the target app while backup, restore, replace, or cleanup runs;
 - testing with expendable data before using the app on important data.
 
-App data may contain account state, databases, preferences, downloads, offline
-content, and files stored with app-specific expectations. A restore can fail
-to reproduce login state, purchases, Keychain items, App Group content, or app
-behavior even when files were copied successfully.
+App data can include account state, databases, preferences, downloads and
+offline content. Even when files are copied successfully, a restore may not
+bring back login state, purchases, Keychain items or App Group data.
 
 WQManager is not affiliated with Apple or with the developers of managed apps.
 The authors do not guarantee that a backup is complete, that restored data will
