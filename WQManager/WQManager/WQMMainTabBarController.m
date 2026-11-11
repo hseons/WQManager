@@ -25,7 +25,7 @@
     UINavigationController *apps = [[UINavigationController alloc] initWithRootViewController:appsRoot];
     apps.navigationBar.prefersLargeTitles = YES;
     apps.tabBarItem = [[UITabBarItem alloc] initWithTitle:WQML(@"TAB_APPS", @"应用")
-                                                   image:[UIImage systemImageNamed:@"square.grid.2x2"]
+                                                   image:[self tabImageNamed:@"AppsTab" fallback:@"square.grid.2x2"]
                                                      tag:0];
 
     WQMBackupsViewController *backupsRoot = [WQMBackupsViewController new];
@@ -147,5 +147,16 @@
     return navigation;
 }
 
-@end
+- (UIImage *)tabImageNamed:(NSString *)name fallback:(NSString *)symbol
+{
+    UIImage *image = [UIImage imageNamed:name];
+    if (!image) return [UIImage systemImageNamed:symbol];
+    CGSize size = CGSizeMake(25, 25);
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
+    UIImage *scaled = [renderer imageWithActions:^(UIGraphicsImageRendererContext *__unused context) {
+        [image drawInRect:CGRectMake(0, 0, size.width, size.height)];
+    }];
+    return [scaled imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
 
+@end
