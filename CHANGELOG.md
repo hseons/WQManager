@@ -26,6 +26,7 @@ semantic versioning once it reaches 1.0.
 
 ### Changed
 
+- New app icon: four rounded squares, with matching dark and tinted variants.
 - Version 0.2 (build 2).
 - Cleaner list redesigned after the iOS 26 "storage" pattern: big selection
   circle, app icon, title + subtitle, right-aligned size, chevron, and a
