@@ -69,7 +69,9 @@
 "ABOUT" = "关于";
 "GITHUB_REPOSITORY" = "GitHub 仓库";
 "MINIMUM_OS" = "最低系统";
-"DEVELOPMENT_FOOTER" = "WQManager 0.1 为开发预览版本。";
+"DEVELOPMENT_FOOTER" = "WQManager %@ 为开发预览版本。";
+"SETTINGS_ABOUT" = "关于";
+"SETTINGS_GITHUB_SUBTITLE" = "给个 star 吧～";
 "DOC_NOT_FOUND" = "文档资源未找到。";
 "OK" = "确定";
 "CANCEL" = "取消";

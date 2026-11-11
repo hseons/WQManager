@@ -11,9 +11,17 @@ semantic versioning once it reaches 1.0.
 - Cleaner rows no longer clip text at large Dynamic Type sizes; every row uses
   intrinsic height and a `>= 52 pt` minimum.
 - Dashboard progress ring no longer jitters when the selection changes.
+- Cleaner drawers expand/collapse inside the table update transaction, so the
+  app icon no longer jitters while the card resizes.
+
+### Added
+
+- Settings → About now links to the project on GitHub, with the star icon and a
+  short "give it a star" line (0.2).
 
 ### Changed
 
+- Version 0.2 (build 2).
 - Cleaner list redesigned after the iOS 26 "storage" pattern: big selection
   circle, app icon, title + subtitle, right-aligned size, chevron, and a
   per-app drawer with `Library/Caches` / `tmp` as selectable sub-rows.

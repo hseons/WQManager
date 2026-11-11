@@ -924,8 +924,9 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
 
     _titleLabel.text = item.name;
     _titleLabel.textColor = item.eligible ? WQMTheme.textPrimaryColor : WQMTheme.textSecondaryColor;
-    _iconView.image = [WQMAppIconService iconForBundleIdentifier:item.bundleIdentifier
-                                                     displayName:item.name];
+    UIImage *icon = [WQMAppIconService iconForBundleIdentifier:item.bundleIdentifier
+                                                   displayName:item.name];
+    if (icon && icon != _iconView.image) _iconView.image = icon;
     _iconView.alpha = item.eligible ? 1 : 0.5;
     _sizeLabel.text = item.eligible ? WQMFormatBytes(item.bytes) : @"";
 
@@ -962,8 +963,9 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
 
 - (void)refreshIconWithItem:(WQMCleanItem *)item
 {
-    _iconView.image = [WQMAppIconService iconForBundleIdentifier:item.bundleIdentifier
-                                                     displayName:item.name];
+    UIImage *icon = [WQMAppIconService iconForBundleIdentifier:item.bundleIdentifier
+                                                   displayName:item.name];
+    if (icon && icon != _iconView.image) _iconView.image = icon;
 }
 
 - (void)configureEmptyScanning:(BOOL)scanning status:(NSString *)status
@@ -1351,8 +1353,8 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
     if (expanded) [_expandedKeys addObject:key];
     else [_expandedKeys removeObject:key];
     WQMCleanerCell *cell = (WQMCleanerCell *)[tableView cellForRowAtIndexPath:indexPath];
-    [cell setExpanded:expanded animated:YES];
     [tableView beginUpdates];
+    [cell setExpanded:expanded animated:YES];
     [tableView endUpdates];
 }
 

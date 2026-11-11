@@ -154,6 +154,16 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
 {
     [super viewDidAppear:animated];
 #if DEBUG
+    if ([NSProcessInfo.processInfo.environment[@"WQM_UI_SETTINGS_SCROLL"] boolValue]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            CGFloat bottom = self.tableView.contentSize.height - self.tableView.bounds.size.height
+                           + self.tableView.adjustedContentInset.bottom + 96;
+            if (bottom > 0) [self.tableView setContentOffset:CGPointMake(0, bottom) animated:NO];
+        });
+    }
+#endif
+#if DEBUG
     NSString *fixtureRow = NSProcessInfo.processInfo.environment[@"WQM_UI_SETTINGS_DOC"];
     if (fixtureRow.length && !_presentedFixtureDocument) {
         _presentedFixtureDocument = YES;
@@ -194,25 +204,27 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
     });
 }
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 3; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 4; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
     if (section == 0) return 3;
     if (section == 1) return 4;
-    return 4;
+    if (section == 2) return 4;
+    return 1;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
 {
     if (section == 0) return WQML(@"SETTINGS_APP", @"应用");
     if (section == 1) return WQML(@"SETTINGS_DATA", @"数据");
-    return WQML(@"SETTINGS_DOCS", @"文档与许可");
+    if (section == 2) return WQML(@"SETTINGS_DOCS", @"文档与许可");
+    return WQML(@"SETTINGS_ABOUT", @"关于");
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
 {
-    if (section == 2) return WQML(@"DEVELOPMENT_FOOTER", @"WQManager 0.1 为开发预览版本。");
+    if (section == 3) return [NSString stringWithFormat:WQML(@"DEVELOPMENT_FOOTER", @"WQManager %@ 为开发预览版本。"), _versionText ?: @""];
     return nil;
 }
 
@@ -273,6 +285,15 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
                    action:@selector(cleanDoubleConfirmToggled:)
          forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = toggle;
+    } else if (indexPath.section == 3) {
+        content.text = @"GitHub";
+        content.secondaryText = WQML(@"SETTINGS_GITHUB_SUBTITLE", @"给个 star 吧～");
+        UIImage *star = [UIImage imageNamed:@"Star"];
+        content.image = star ? [star imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]
+                             : [UIImage systemImageNamed:@"star.fill"];
+        content.imageProperties.maximumSize = CGSizeMake(24, 24);
+        content.imageProperties.reservedLayoutSize = CGSizeMake(24, 24);
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else {
         NSArray<NSString *> *titles = @[
             WQML(@"DISCLAIMER", @"免责协议"),
@@ -319,6 +340,11 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
             [self reloadState];
         }]];
         [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    if (indexPath.section == 3) {
+        NSURL *url = [NSURL URLWithString:@"https://github.com/hhse/WQManager"];
+        if (url) [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
         return;
     }
     if (indexPath.section != 2) return;

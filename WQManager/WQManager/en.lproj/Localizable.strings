@@ -69,7 +69,9 @@
 "ABOUT" = "About";
 "GITHUB_REPOSITORY" = "GitHub Repository";
 "MINIMUM_OS" = "Minimum OS";
-"DEVELOPMENT_FOOTER" = "WQManager 0.1 is a development preview.";
+"DEVELOPMENT_FOOTER" = "WQManager %@ is a development preview.";
+"SETTINGS_ABOUT" = "About";
+"SETTINGS_GITHUB_SUBTITLE" = "Give it a star～";
 "DOC_NOT_FOUND" = "Documentation resource not found.";
 "OK" = "OK";
 "CANCEL" = "Cancel";
