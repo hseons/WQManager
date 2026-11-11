@@ -8,7 +8,7 @@
 #ifndef WQMProjectLinks_h
 #define WQMProjectLinks_h
 
-#define WQM_REPOSITORY_OWNER @"hhse"
+#define WQM_REPOSITORY_OWNER @"hseons"
 #define WQM_REPOSITORY_NAME @"WQManager"
 #define WQM_REPOSITORY_SLUG WQM_REPOSITORY_OWNER @"/" WQM_REPOSITORY_NAME
 #define WQM_REPOSITORY_URL @"https://github.com/" WQM_REPOSITORY_SLUG

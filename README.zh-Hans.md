@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hhse/WQManager">github.com/hhse/WQManager</a>
+  <a href="https://github.com/hseons/WQManager">github.com/hseons/WQManager</a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/hhse/WQManager"><img src="docs/images/star.svg" width="16" alt="star"> 给个 star 吧～</a>
+  <a href="https://github.com/hseons/WQManager"><img src="docs/images/star.svg" width="16" alt="star"> 给个 star 吧～</a>
 </p>
 
 <p align="center">
