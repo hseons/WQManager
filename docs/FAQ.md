@@ -115,6 +115,7 @@ problem, usually fixed by clearing DerivedData.
 
 ### How do I regenerate the docs screenshots?
 
-Run the app with `WQM_UI_FIXTURES=1`, the relevant `WQM_UI_FIXTURES_TAB`, and
-`SIMCTL_CHILD_WQM_UI_FIXTURE_NEUTRAL=1` in a debug build to hide the
-"UI test data" label, then use `xcrun simctl io <udid> screenshot`.
+Run a debug build with `WQM_UI_FIXTURES=1` and the relevant
+`WQM_UI_FIXTURES_TAB`, then use `xcrun simctl io <udid> screenshot`. The list
+will carry the "UI test data" label; that is expected for fixture runs. Device
+screenshots should be used when the label must not appear.
