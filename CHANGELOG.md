@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
-## [0.2.0] — 2026-11-11
+## [0.2.1] — 2026-11-11
 
 ### Fixed
 
@@ -12,6 +12,11 @@ semantic versioning once it reaches 1.0.
   scanner releases each app's token right after measuring it instead of keeping
   one per app until the LRU evicts them. A scan timing log is written to
   `Documents/scan-diag-latest.log` and removed when the scan finishes.
+
+## [0.2.0] — 2026-11-11
+
+### Fixed
+
 
 - Remote icon lookups no longer treat network errors as a permanent "not on
   the store" result: transient failures get one retry, misses expire after
