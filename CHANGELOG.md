@@ -8,6 +8,11 @@ semantic versioning once it reaches 1.0.
 
 ### Fixed
 
+- Builds no longer fail on `Failed to write Objective-C generated asset symbols.`
+  The project does not use the generated asset-symbol constants, so
+  `ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS` is now `NO` (Xcode's actool was
+  denied writing `GeneratedAssetSymbols.h` into DerivedData on this machine).
+
 - The share extension now asks the system to open WQManager after a successful
   import (responder-chain fallback when `NSExtensionContext.openURL:` refuses).
   If the system still keeps the share sheet open, the queued file is imported
