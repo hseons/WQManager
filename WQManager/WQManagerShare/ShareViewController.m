@@ -93,8 +93,9 @@
                 return;
             }
             [weakSelf finishWithMessage:@"已交给 WQManager，正在打开…" success:YES];
-            NSURL *openURL = [NSURL URLWithString:@"wqmanager://import"];
-            [weakSelf.extensionContext openURL:openURL completionHandler:nil];
+            if (![weakSelf openHostApp]) {
+                weakSelf.statusLabel.text = @"已保存。若没有自动打开，请回到 WQManager，进入备份页后会继续导入。";
+            }
         });
     }];
 }
@@ -103,16 +104,31 @@
 {
     self.statusLabel.text = @"当前签名未启用 App Group，正在打开手动导入…";
     self.statusLabel.textColor = UIColor.secondaryLabelColor;
-    NSURL *openURL = [NSURL URLWithString:@"wqmanager://import"];
-    __weak typeof(self) weakSelf = self;
-    [self.extensionContext openURL:openURL completionHandler:^(BOOL success) {
-        if (success) return;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf finishWithMessage:
-                @"当前签名未启用 App Group。请打开 WQManager → 备份 → 左上角导入。"
-                                     success:NO];
-        });
-    }];
+    if (![self openHostApp]) {
+        [self finishWithMessage:
+            @"当前签名未启用 App Group。请打开 WQManager → 备份 → 左上角导入。"
+                             success:NO];
+    }
+}
+
+- (BOOL)openHostApp
+{
+    NSURL *url = [NSURL URLWithString:@"wqmanager://import"];
+    SEL selector = NSSelectorFromString(@"openURL:");
+    UIResponder *responder = self;
+    while ((responder = [responder nextResponder])) {
+        if ([responder respondsToSelector:selector]) {
+            IMP implementation = [responder methodForSelector:selector];
+            void (*function)(id, SEL, id) = (void *)implementation;
+            function(responder, selector, url);
+            return YES;
+        }
+    }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    [self.extensionContext openURL:url completionHandler:nil];
+#pragma clang diagnostic pop
+    return NO;
 }
 
 - (void)finishWithMessage:(NSString *)message success:(BOOL)success

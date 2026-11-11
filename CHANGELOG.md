@@ -8,6 +8,11 @@ semantic versioning once it reaches 1.0.
 
 ### Fixed
 
+- The share extension now asks the system to open WQManager after a successful
+  import (responder-chain fallback when `NSExtensionContext.openURL:` refuses).
+  If the system still keeps the share sheet open, the queued file is imported
+  automatically the next time WQManager becomes active.
+
 - Cleaner rows no longer clip text at large Dynamic Type sizes; every row uses
   intrinsic height and a `>= 52 pt` minimum.
 - Dashboard progress ring no longer jitters when the selection changes.
