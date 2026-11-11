@@ -1,15 +1,31 @@
-# WQManager
+<h1 align="center">WQManager</h1>
 
-**一款面向 iOS 26+ 的开源 App 数据管理、备份与单应用缓存清理工具，无需越狱。**
+<p align="center">
+  <img src="docs/images/icon.png" width="120" alt="WQManager 图标">
+</p>
 
-[English](README.md) · [安全说明](SAFETY.md) · [架构](docs/ARCHITECTURE.md) · [构建](docs/BUILDING.md) · [常见问题](docs/FAQ.md)
+<p align="center">
+  <strong>一款面向 iOS 26+ 的开源 App 数据管理、备份与单应用缓存清理工具，无需越狱。</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hhse/WQManager">github.com/hhse/WQManager</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/hhse/WQManager"><img src="docs/images/star.svg" width="16" alt="star"> 给个 star 吧～</a>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="SAFETY.md">安全说明</a> ·
+  <a href="docs/ARCHITECTURE.md">架构</a> ·
+  <a href="docs/BUILDING.md">构建</a> ·
+  <a href="docs/FAQ.md">常见问题</a>
+</p>
 
 > WQManager 与 Apple 无关。iOS 的 App 数据天然隔离，本项目能工作完全依赖
 > [worse_query](https://github.com/forcequitOS/worse_query) 公开的沙盒扩展技巧。
 > 在存有重要数据的设备上使用前，请先读 [SAFETY.md](SAFETY.md) 与
 > [DISCLAIMER.md](DISCLAIMER.md)。
-
-![应用页](docs/images/apps.png)
 
 ## 能做什么
 
@@ -203,7 +219,7 @@ device/inode、规范路径和符号链接祖先链。
 
 ## 致谢
 
-没有这些项目和人，就没有 WQManager。App 内致谢页也会显示头像与链接。
+没有这些项目和人，就没有 WQManager。
 
 | | 作者 | 项目 | 贡献 |
 |---|---|---|---|

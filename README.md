@@ -1,17 +1,33 @@
-# WQManager
+<h1 align="center">WQManager</h1>
 
-**An open-source iOS app data manager, backup tool and per-app cache cleaner for
-iOS 26 and later — no jailbreak required.**
+<p align="center">
+  <img src="docs/images/icon.png" width="120" alt="WQManager icon">
+</p>
 
-[简体中文](README.zh-Hans.md) · [Safety](SAFETY.md) · [Architecture](docs/ARCHITECTURE.md) · [Building](docs/BUILDING.md) · [FAQ](docs/FAQ.md)
+<p align="center">
+  <strong>An open-source iOS app data manager, backup tool and per-app cache
+  cleaner for iOS 26 and later — no jailbreak required.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hhse/WQManager">github.com/hhse/WQManager</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/hhse/WQManager"><img src="docs/images/star.svg" width="16" alt="star"> Give it a star if it helps～</a>
+</p>
+
+<p align="center">
+  <a href="README.zh-Hans.md">简体中文</a> ·
+  <a href="SAFETY.md">Safety</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/BUILDING.md">Building</a> ·
+  <a href="docs/FAQ.md">FAQ</a>
+</p>
 
 > WQManager is not affiliated with Apple. iOS app data is private by design;
 > this project only works because of a sandbox-extension technique published in
 > [worse_query](https://github.com/forcequitOS/worse_query). Read
 > [SAFETY.md](SAFETY.md) and [DISCLAIMER.md](DISCLAIMER.md) before using it on a
 > device that holds data you care about.
-
-![Applications](docs/images/apps.png)
 
 ## What it does
 
@@ -228,8 +244,7 @@ package format, the restore state machine and the threat model.
 
 ## Credits
 
-WQManager would not exist without these projects and people. The in-app
-credits screen lists them with avatars and links.
+WQManager would not exist without these projects and people.
 
 | | Author | Project | Contribution |
 |---|---|---|---|
