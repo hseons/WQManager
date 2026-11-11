@@ -8,6 +8,12 @@ semantic versioning once it reaches 1.0.
 
 ### Fixed
 
+- Remote icon lookups no longer treat network errors as a permanent "not on
+  the store" result: transient failures get one retry, misses expire after
+  24 hours, and requests are paced to avoid burst throttling. A late remote
+  image can also no longer be overwritten by a letter fallback, and revisiting
+  a fallback row reloads a previously downloaded icon from disk.
+
 - The cleaner dashboard ring now re-resolves its colors when the interface
   style changes, so it stays visible in dark mode.
 
