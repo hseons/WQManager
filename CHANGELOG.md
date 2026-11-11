@@ -6,27 +6,24 @@ semantic versioning once it reaches 1.0.
 
 ## [0.2.1] — 2026-11-11
 
-### Fixed
-
-- Large scans no longer stall around the kernel sandbox-extension limit: the
-  scanner releases each app's token right after measuring it instead of keeping
-  one per app until the LRU evicts them. A scan timing log is written to
-  `Documents/scan-diag-latest.log` and removed when the scan finishes.
-
-## [Unreleased]
-
 ### Added
 
-- Scan diagnostics: `Documents/scan-diag-latest.log` records every app's
-  `grant` / `label` / `measure` timings plus a 3-second watchdog line.
+- Settings → Check for Updates: reads the latest GitHub release and links to it,
+  so users can see whether a newer build exists without leaving the app.
+- Tab bar uses a dark-green highlight for the selected item.
+- Scan diagnostics: `Documents/scan-diag-latest.log` records each app's
+  `grant` / `label` / `measure` timings plus a watchdog line.
 
-  ### Fixed
+### Fixed
 
-- Large scans no longer keep one sandbox extension per app; the scanner drops
-  each token right after measuring, avoiding LRU churn past 192 grants.
+- Large scans no longer stall around the kernel sandbox-extension limit: each
+  app's token is released right after measuring instead of being kept until the
+  LRU evicts it.
 - Scans no longer stall on a single huge or badly fragmented container: the
   quick pass budgets each tree (12,000 entries / 0.25 s) and deferred apps are
   measured afterwards with their own progress, so the app count keeps moving.
+- The update check resolves `releases/latest` via its redirect, avoiding the
+  unauthenticated GitHub API rate limit.
 
 ## [0.2.0] — 2026-11-11
 
