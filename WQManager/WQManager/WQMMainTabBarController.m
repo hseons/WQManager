@@ -39,7 +39,7 @@
     UINavigationController *cleaner = [[UINavigationController alloc] initWithRootViewController:cleanerRoot];
     cleaner.navigationBar.prefersLargeTitles = YES;
     cleaner.tabBarItem = [[UITabBarItem alloc] initWithTitle:WQML(@"TAB_CLEAN", @"清理")
-                                                     image:[UIImage systemImageNamed:@"trash"]
+                                                     image:[self tabImageNamed:@"Broom" fallback:@"trash"]
                                                        tag:0];
 
     WQMHistoryViewController *historyRoot = [WQMHistoryViewController new];
