@@ -19,90 +19,23 @@ static NSString *WQMScanDiagPath(void)
     return path;
 }
 
-static CFAbsoluteTime gScanDiagStarted;
-static NSInteger gScanDiagIndex;
-static NSString *gScanDiagStage = @"init";
-static CFAbsoluteTime gScanMainPing;
-static dispatch_source_t gScanDiagWatchdog;
-static dispatch_source_t gScanDiagPing;
+static void WQMScanDiagWrite(NSString *text)
+{
+    NSError *error = nil;
+    [text writeToFile:WQMScanDiagPath() atomically:YES encoding:NSUTF8StringEncoding error:&error];
+}
 
 static void WQMScanDiagAppend(NSString *line)
 {
-    @synchronized (WQMScanDiagPath()) {
-        NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:WQMScanDiagPath()];
-        if (!handle) return;
-        @try {
-            unsigned long long size = [handle seekToEndOfFile];
-            if (size < 4 * 1024 * 1024) {
-                [handle writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
-            }
-        } @catch (__unused NSException *exception) {
-        } @finally {
-            [handle closeFile];
-        }
+    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:WQMScanDiagPath()];
+    if (!handle) return;
+    @try {
+        [handle seekToEndOfFile];
+        [handle writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+    } @catch (__unused NSException *exception) {
+    } @finally {
+        [handle closeFile];
     }
-}
-
-static void WQMScanDiagSetStage(NSInteger index, NSString *stage)
-{
-    @synchronized (WQMScanDiagPath()) {
-        gScanDiagIndex = index;
-        gScanDiagStage = [stage copy];
-    }
-}
-
-static void WQMScanDiagStart(NSUInteger total)
-{
-    @synchronized (WQMScanDiagPath()) {
-        gScanDiagStarted = CFAbsoluteTimeGetCurrent();
-        gScanDiagIndex = 0;
-        gScanDiagStage = @"enumerate";
-        gScanMainPing = gScanDiagStarted;
-    }
-    NSString *header = [NSString stringWithFormat:
-        @"scan diag start %@ total=%lu pid=%d\n",
-        NSDate.date, (unsigned long)total, getpid()];
-    [header writeToFile:WQMScanDiagPath() atomically:YES encoding:NSUTF8StringEncoding error:nil];
-
-    if (gScanDiagPing) dispatch_source_cancel(gScanDiagPing);
-    gScanDiagPing = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    dispatch_source_set_timer(gScanDiagPing, dispatch_time(DISPATCH_TIME_NOW, 0),
-                              1 * NSEC_PER_SEC, 200 * NSEC_PER_MSEC);
-    dispatch_source_set_event_handler(gScanDiagPing, ^{
-        gScanMainPing = CFAbsoluteTimeGetCurrent();
-    });
-    dispatch_resume(gScanDiagPing);
-
-    if (gScanDiagWatchdog) dispatch_source_cancel(gScanDiagWatchdog);
-    gScanDiagWatchdog = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
-                                               dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
-    dispatch_source_set_timer(gScanDiagWatchdog, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
-                              3 * NSEC_PER_SEC, 500 * NSEC_PER_MSEC);
-    dispatch_source_set_event_handler(gScanDiagWatchdog, ^{
-        NSInteger index;
-        NSString *stage;
-        CFAbsoluteTime started;
-        CFAbsoluteTime ping;
-        @synchronized (WQMScanDiagPath()) {
-            index = gScanDiagIndex;
-            stage = gScanDiagStage ?: @"?";
-            started = gScanDiagStarted;
-            ping = gScanMainPing;
-        }
-        NSTimeInterval elapsed = CFAbsoluteTimeGetCurrent() - started;
-        NSTimeInterval age = CFAbsoluteTimeGetCurrent() - ping;
-        WQMScanDiagAppend([NSString stringWithFormat:
-            @"watchdog idx=%ld stage=%@ elapsed=%.0fs main=%@\n",
-            (long)index, stage, elapsed, age > 3.0 ? @"blocked" : @"alive"]);
-    });
-    dispatch_resume(gScanDiagWatchdog);
-}
-
-static void WQMScanDiagStop(NSString *note)
-{
-    if (gScanDiagPing) { dispatch_source_cancel(gScanDiagPing); gScanDiagPing = nil; }
-    if (gScanDiagWatchdog) { dispatch_source_cancel(gScanDiagWatchdog); gScanDiagWatchdog = nil; }
-    WQMScanDiagAppend([NSString stringWithFormat:@"scan diag stop %@ %@\n", note, NSDate.date]);
 }
 
 static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
@@ -144,7 +77,6 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
 
         WQMAppScanResult *result = [WQMAppScanResult new];
         report(WQML(@"SCAN_FINDING_CONTAINERS", @"正在查找 App 容器…"));
-        WQMScanDiagStart(0);
 
 #if DEBUG
         if ([NSProcessInfo.processInfo.environment[@"WQM_UI_FIXTURES"] boolValue]) {
@@ -187,7 +119,6 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
                 : [NSString stringWithFormat:
                    WQML(@"SCAN_FIXTURE_STATUS", @"%lu 个 App · UI 测试数据"),
                    (unsigned long)apps.count];
-            WQMScanDiagStop(@"fixtures");
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{ completion(result); });
             return;
@@ -207,7 +138,6 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
         if (cancellation.isCancelled) {
             result.cancelled = YES;
             result.status = WQML(@"SCAN_CANCELLED", @"扫描已取消");
-            WQMScanDiagStop(@"cancelled after enumerate");
             dispatch_async(dispatch_get_main_queue(), ^{ completion(result); });
             return;
         }
@@ -218,7 +148,6 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
                 ? WQML(@"SCAN_DATABASE_UNAVAILABLE",
                        @"未找到可用的 App 数据库；本阶段不启动耗时的全盘扫描。")
                 : WQML(@"SCAN_ENUMERATION_FAILED", @"无法枚举 App 容器，请查看日志或稍后重试。");
-            WQMScanDiagStop(@"no containers");
             dispatch_async(dispatch_get_main_queue(), ^{ completion(result); });
             return;
         }
@@ -227,9 +156,8 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
         if (!wq_display_names_loaded()) wq_load_display_names();
 
         NSString *home = [NSHomeDirectory() stringByResolvingSymlinksInPath];
-        WQMScanDiagSetStage(0, @"loop");
-        WQMScanDiagAppend([NSString stringWithFormat:@"enumerated=%lu\n",
-                           (unsigned long)containers.count]);
+        WQMScanDiagWrite([NSString stringWithFormat:@"scan start containers=%lu at %@\n",
+                          (unsigned long)containers.count, NSDate.date]);
         NSMutableArray<WQMAppModel *> *apps = [NSMutableArray arrayWithCapacity:containers.count];
         NSUInteger limited = 0;
         NSUInteger index = 0;
@@ -246,10 +174,8 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
                     (unsigned long)index, (unsigned long)containers.count]);
 
             CFAbsoluteTime t0 = CFAbsoluteTimeGetCurrent();
-            WQMScanDiagSetStage(index, @"grant");
             BOOL granted = wq_grant(container);
             CFAbsoluteTime t1 = CFAbsoluteTimeGetCurrent();
-            WQMScanDiagSetStage(index, @"label");
             NSString *bundleID = wq_container_label(container);
             CFAbsoluteTime t2 = CFAbsoluteTimeGetCurrent();
             if (!WQMBundleIdentifierLooksValid(bundleID)) bundleID = nil;
@@ -270,7 +196,6 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
             app.containerInode = hasIdentity ? identity.st_ino : 0;
 
             unsigned long long bytes = 0;
-            WQMScanDiagSetStage(index, @"measure");
             if (granted && hasIdentity) {
                 WQMeasureResult measured = wq_measure_tree(container, cancellation, &bytes);
                 if (measured == WQMeasureResultCancelled) {
@@ -286,13 +211,14 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
             // and re-query tokens once the LRU limit is reached, which stalls
             // large scans. The measurement is done, so give the token back.
             CFAbsoluteTime t3 = CFAbsoluteTimeGetCurrent();
-            WQMScanDiagSetStage(index, @"drop");
             wq_drop_grant(container);
-            WQMScanDiagAppend([NSString stringWithFormat:
-                @"%lu/%lu grant=%.0fms label=%.0fms measure=%.0fms ok=%d %@\n",
-                (unsigned long)index, (unsigned long)containers.count,
-                (t1 - t0) * 1000.0, (t2 - t1) * 1000.0, (t3 - t2) * 1000.0,
-                granted, container.lastPathComponent]);
+            if (index % 10 == 0 || (t3 - t0) > 1.0) {
+                WQMScanDiagAppend([NSString stringWithFormat:
+                    @"%lu/%lu grant=%.0fms label=%.0fms measure=%.0fms ok=%d %@\n",
+                    (unsigned long)index, (unsigned long)containers.count,
+                    (t1 - t0) * 1000.0, (t2 - t1) * 1000.0, (t3 - t2) * 1000.0,
+                    granted, container.lastPathComponent]);
+            }
             if (!granted || !bundleID.length || !hasIdentity || !app.sizeKnown) limited++;
             [apps addObject:app];
         }
@@ -321,7 +247,11 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
             }
         }
 
-        WQMScanDiagStop(result.cancelled ? @"cancelled" : @"done");
+        if (!result.cancelled) {
+            [[NSFileManager defaultManager] removeItemAtPath:WQMScanDiagPath() error:nil];
+        } else {
+            WQMScanDiagAppend(@"scan cancelled\n");
+        }
         dispatch_async(dispatch_get_main_queue(), ^{ completion(result); });
     });
 }
