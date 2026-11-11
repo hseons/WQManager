@@ -23,6 +23,9 @@ NSString *_Nullable wq_app_group(void);
 // Asks for a sandbox extension covering path (once per path). Returns YES
 // when one is held for it.
 BOOL wq_grant(NSString *path);
+/// Release the token for a path once it is no longer needed. Keeps the
+/// process well below the kernel extension limit during long scans.
+void wq_drop_grant(NSString *path);
 
 // Directory listing; asks for access when the plain call is refused.
 NSArray<NSString *> *_Nullable wq_list(NSString *dir, NSString *_Nullable *_Nullable errorText);

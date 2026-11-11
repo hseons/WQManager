@@ -320,6 +320,20 @@ BOOL wq_grant(NSString *path)
     return handle >= 0;
 }
 
+void wq_drop_grant(NSString *path)
+{
+    if (!gGrantLock) return;
+    NSString *key = wq_norm(path);
+    [gGrantLock lock];
+    NSNumber *handle = gGrants[key];
+    if (handle) {
+        wq_release_handle(handle.longLongValue);
+        [gGrants removeObjectForKey:key];
+        [gGrantOrder removeObject:key];
+    }
+    [gGrantLock unlock];
+}
+
 static BOOL wq_is_denied(int err) { return err == EPERM || err == EACCES; }
 
 #pragma mark - Backups

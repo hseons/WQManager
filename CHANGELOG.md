@@ -8,6 +8,11 @@ semantic versioning once it reaches 1.0.
 
 ### Fixed
 
+- Large scans no longer stall around the kernel sandbox-extension limit: the
+  scanner releases each app's token right after measuring it instead of keeping
+  one per app until the LRU evicts them. A scan timing log is written to
+  `Documents/scan-diag-latest.log` and removed when the scan finishes.
+
 - Remote icon lookups no longer treat network errors as a permanent "not on
   the store" result: transient failures get one retry, misses expire after
   24 hours, and requests are paced to avoid burst throttling. A late remote

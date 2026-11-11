@@ -440,6 +440,10 @@
         [self scan];
         return;
     }
+    if ([NSProcessInfo.processInfo.environment[@"WQM_UI_FORCE_SCAN"] boolValue]) {
+        [self scan];
+        return;
+    }
 #endif
     WQMAppCacheSnapshot *cache = [WQMAppCache load];
     if (cache.apps.count) {

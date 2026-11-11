@@ -8,6 +8,36 @@
 
 static NSString *const kWQMAppDataRoot = @"/private/var/mobile/Containers/Data/Application";
 
+static NSString *WQMScanDiagPath(void)
+{
+    static NSString *path;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        path = [docs stringByAppendingPathComponent:@"scan-diag-latest.log"];
+    });
+    return path;
+}
+
+static void WQMScanDiagWrite(NSString *text)
+{
+    NSError *error = nil;
+    [text writeToFile:WQMScanDiagPath() atomically:YES encoding:NSUTF8StringEncoding error:&error];
+}
+
+static void WQMScanDiagAppend(NSString *line)
+{
+    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:WQMScanDiagPath()];
+    if (!handle) return;
+    @try {
+        [handle seekToEndOfFile];
+        [handle writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+    } @catch (__unused NSException *exception) {
+    } @finally {
+        [handle closeFile];
+    }
+}
+
 static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
 {
     if (identifier.length < 3 || identifier.length > 255 ||
@@ -126,6 +156,8 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
         if (!wq_display_names_loaded()) wq_load_display_names();
 
         NSString *home = [NSHomeDirectory() stringByResolvingSymlinksInPath];
+        WQMScanDiagWrite([NSString stringWithFormat:@"scan start containers=%lu at %@\n",
+                          (unsigned long)containers.count, NSDate.date]);
         NSMutableArray<WQMAppModel *> *apps = [NSMutableArray arrayWithCapacity:containers.count];
         NSUInteger limited = 0;
         NSUInteger index = 0;
@@ -141,8 +173,11 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
             report([NSString stringWithFormat:WQML(@"SCAN_READING_PROGRESS", @"正在读取 %lu/%lu…"),
                     (unsigned long)index, (unsigned long)containers.count]);
 
+            CFAbsoluteTime t0 = CFAbsoluteTimeGetCurrent();
             BOOL granted = wq_grant(container);
+            CFAbsoluteTime t1 = CFAbsoluteTimeGetCurrent();
             NSString *bundleID = wq_container_label(container);
+            CFAbsoluteTime t2 = CFAbsoluteTimeGetCurrent();
             if (!WQMBundleIdentifierLooksValid(bundleID)) bundleID = nil;
 
             struct stat identity = {0};
@@ -172,6 +207,18 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
             } else {
                 app.sizeKnown = NO;
             }
+            // Holding one sandbox extension per app makes the kernel release
+            // and re-query tokens once the LRU limit is reached, which stalls
+            // large scans. The measurement is done, so give the token back.
+            CFAbsoluteTime t3 = CFAbsoluteTimeGetCurrent();
+            wq_drop_grant(container);
+            if (index % 10 == 0 || (t3 - t0) > 1.0) {
+                WQMScanDiagAppend([NSString stringWithFormat:
+                    @"%lu/%lu grant=%.0fms label=%.0fms measure=%.0fms ok=%d %@\n",
+                    (unsigned long)index, (unsigned long)containers.count,
+                    (t1 - t0) * 1000.0, (t2 - t1) * 1000.0, (t3 - t2) * 1000.0,
+                    granted, container.lastPathComponent]);
+            }
             if (!granted || !bundleID.length || !hasIdentity || !app.sizeKnown) limited++;
             [apps addObject:app];
         }
@@ -200,6 +247,11 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
             }
         }
 
+        if (!result.cancelled) {
+            [[NSFileManager defaultManager] removeItemAtPath:WQMScanDiagPath() error:nil];
+        } else {
+            WQMScanDiagAppend(@"scan cancelled\n");
+        }
         dispatch_async(dispatch_get_main_queue(), ^{ completion(result); });
     });
 }
