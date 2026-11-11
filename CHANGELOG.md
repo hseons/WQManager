@@ -8,6 +8,9 @@ semantic versioning once it reaches 1.0.
 
 ### Fixed
 
+- The cleaner dashboard ring now re-resolves its colors when the interface
+  style changes, so it stays visible in dark mode.
+
 - Builds no longer fail on `Failed to write Objective-C generated asset symbols.`
   The project does not use the generated asset-symbol constants, so
   `ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS` is now `NO` (Xcode's actool was

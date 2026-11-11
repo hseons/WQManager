@@ -60,6 +60,10 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
             [_centerLabel.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:16],
             [_centerLabel.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-16],
         ]];
+        [self updateRingColors];
+        [self registerForTraitChanges:@[UITraitUserInterfaceStyle.class]
+                           withTarget:self
+                               action:@selector(updateRingColors)];
     }
     return self;
 }
@@ -78,6 +82,16 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
     _progressLayer.frame = self.bounds;
     _trackLayer.path = path.CGPath;
     _progressLayer.path = path.CGPath;
+}
+
+- (void)updateRingColors
+{
+    UITraitCollection *traits = self.traitCollection;
+    _trackLayer.strokeColor =
+        [WQMTheme.separatorColor resolvedColorWithTraitCollection:traits].CGColor;
+    _progressLayer.strokeColor =
+        [WQMTheme.textPrimaryColor resolvedColorWithTraitCollection:traits].CGColor;
+    _centerLabel.textColor = WQMTheme.textPrimaryColor;
 }
 
 - (void)setProgress:(CGFloat)progress animated:(BOOL)animated
