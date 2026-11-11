@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.2.2] — 2026-11-11
+
+### Added
+
+- Scan diagnostics that survive a stall: `Documents/scan-diag-latest.log` now
+  records every app's `grant` / `label` / `measure` timings plus a 3-second
+  watchdog line (`stage`, elapsed time, whether the main thread is responsive).
+
 ## [0.2.1] — 2026-11-11
 
 ### Fixed
