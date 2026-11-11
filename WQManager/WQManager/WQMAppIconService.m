@@ -1071,7 +1071,7 @@ static BOOL WQMAppIconDiagnosticsWanted(void)
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSString *value = NSProcessInfo.processInfo.environment[@"WQM_ICON_DIAG"];
-        wanted = value.length ? value.boolValue : YES;
+        wanted = value.length ? value.boolValue : NO;
     });
     return wanted;
 }

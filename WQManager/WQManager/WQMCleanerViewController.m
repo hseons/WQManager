@@ -935,6 +935,8 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
     _currentItem = item;
     _expanded = expanded;
     _visibleTargetIndices = [self visibleTargetIndicesForItem:item];
+    _iconView.contentMode = UIViewContentModeScaleAspectFill;
+    _iconView.backgroundColor = WQMTheme.canvasColor;
 
     _titleLabel.text = item.name;
     _titleLabel.textColor = item.eligible ? WQMTheme.textPrimaryColor : WQMTheme.textSecondaryColor;
@@ -992,8 +994,12 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
     _titleLabel.textColor = WQMTheme.textPrimaryColor;
     _subtitleLabel.text = status;
     _subtitleLabel.hidden = status.length == 0;
-    _iconView.image = [UIImage systemImageNamed:
-                       scanning ? @"arrow.triangle.2.circlepath" : @"checkmark.circle"];
+    _iconView.contentMode = UIViewContentModeScaleAspectFit;
+    _iconView.backgroundColor = UIColor.clearColor;
+    _iconView.tintColor = scanning ? WQMTheme.textPrimaryColor : WQMTheme.textSecondaryColor;
+    _iconView.image = scanning
+        ? [UIImage imageNamed:@"Scan"]
+        : [UIImage systemImageNamed:@"checkmark.circle"];
     _iconView.alpha = 1;
     _sizeLabel.text = @"";
     _selectionButton.hidden = YES;

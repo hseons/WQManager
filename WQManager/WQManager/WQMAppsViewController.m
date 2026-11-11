@@ -248,7 +248,9 @@
     configuration.textProperties.color = WQMTheme.textPrimaryColor;
     configuration.secondaryTextProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
     configuration.secondaryTextProperties.color = WQMTheme.textSecondaryColor;
-    configuration.image = [UIImage systemImageNamed:scanning ? @"arrow.triangle.2.circlepath" : @"rectangle.dashed"];
+    configuration.image = scanning
+        ? [UIImage imageNamed:@"Scan"]
+        : [UIImage systemImageNamed:@"rectangle.dashed"];
     configuration.imageProperties.tintColor = WQMTheme.textSecondaryColor;
     self.listContentView.configuration = configuration;
     self.accessibilityIdentifier = scanning ? @"apps.loading" : @"apps.empty";

@@ -93,8 +93,7 @@ only in `DEBUG` builds.
 
 | Variable | Effect |
 |---|---|
-| `WQM_ICON_DEBUG=1` | verbose icon-resolution logging |
-| `WQM_ICON_DIAG=0` | disable the icon diagnostic log file |
+| `WQM_ICON_DIAG=1` | enable the icon diagnostic log file (disabled by default) |
 | `WQM_ICON_DIAG_ALL=1` | diagnose every scanned app (default: first 12) |
 | `WQM_ICON_DIAG_DUMP=1` | dump raw icon records to `Documents/` |
 | `WQM_ICON_REMOTE=0` | disable App Store artwork lookup |
