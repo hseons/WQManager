@@ -1,0 +1,31 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# Dependency managers
+Pods/
+Carthage/Build/
+.build/
+
+# Test output
+.work/
+TestResults/
+
+# Build products and local distribution artifacts
+dist/
+*.ipa
+*.dSYM/
+
+# macOS
+.DS_Store
+
+# Local signing material
+*.mobileprovision
+*.p12
+*.cer
+*.key
+*.pem

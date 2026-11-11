@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a reproducible problem in WQManager
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please do not attach personal app data or full
+        backups. Security issues belong in a private advisory.
+  - type: input
+    id: device
+    attributes:
+      label: Device and iOS version
+      placeholder: iPhone 17 Pro, iOS 26.1 (23B85)
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: WQManager build
+      description: Version from Settings, or the commit hash.
+    validations:
+      required: true
+  - type: dropdown
+    id: signing
+    attributes:
+      label: How was the app signed?
+      options:
+        - Xcode with a paid developer account
+        - Xcode with a free Apple ID
+        - Third-party signing service
+        - Simulator
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines (optional)
+      description: From Documents/icon-diag-*.log or Console. Remove personal paths if needed.
+      render: text
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmations
+      options:
+        - label: I am not reporting a security vulnerability (those go to a private advisory).
+          required: true
+        - label: I removed personal data from logs and screenshots.
+          required: true
