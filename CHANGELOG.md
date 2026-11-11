@@ -13,6 +13,18 @@ semantic versioning once it reaches 1.0.
   one per app until the LRU evicts them. A scan timing log is written to
   `Documents/scan-diag-latest.log` and removed when the scan finishes.
 
+## [Unreleased]
+
+### Added
+
+- Scan diagnostics: `Documents/scan-diag-latest.log` records every app's
+  `grant` / `label` / `measure` timings plus a 3-second watchdog line.
+
+  ### Fixed
+
+- Large scans no longer keep one sandbox extension per app; the scanner drops
+  each token right after measuring, avoiding LRU churn past 192 grants.
+
 ## [0.2.0] — 2026-11-11
 
 ### Fixed
