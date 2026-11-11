@@ -400,20 +400,24 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
         cell.accessoryView = spinner;
     }
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:
-        [NSURL URLWithString:WQM_REPOSITORY_LATEST_RELEASE_API]];
+        [NSURL URLWithString:[WQM_REPOSITORY_RELEASES_URL stringByAppendingString:@"/latest"]]];
     request.timeoutInterval = 12;
-    [request setValue:@"WQManager" forHTTPHeaderField:@"User-Agent"];
-    [request setValue:@"application/vnd.github+json" forHTTPHeaderField:@"Accept"];
+    [request setValue:@"Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) WQManager"
+   forHTTPHeaderField:@"User-Agent"];
     __weak typeof(self) weakSelf = self;
     [[NSURLSession.sharedSession dataTaskWithRequest:request
-        completionHandler:^(NSData *data, __unused NSURLResponse *response, NSError *error) {
-        NSDictionary *json = nil;
-        if (data.length && !error) {
-            id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            if ([object isKindOfClass:NSDictionary.class]) json = object;
+        completionHandler:^(__unused NSData *data, NSURLResponse *response, NSError *error) {
+        NSString *tag = nil;
+        NSString *page = nil;
+        if (!error) {
+            NSURL *finalURL = response.URL;
+            NSString *path = finalURL.path ?: @"";
+            NSRange marker = [path rangeOfString:@"/releases/tag/"];
+            if (marker.location != NSNotFound) {
+                tag = [path substringFromIndex:NSMaxRange(marker)];
+                page = finalURL.absoluteString;
+            }
         }
-        NSString *tag = [json[@"tag_name"] isKindOfClass:NSString.class] ? json[@"tag_name"] : nil;
-        NSString *page = [json[@"html_url"] isKindOfClass:NSString.class] ? json[@"html_url"] : nil;
         dispatch_async(dispatch_get_main_queue(), ^{
             WQMSettingsViewController *strongSelf = weakSelf;
             if (!strongSelf) return;
