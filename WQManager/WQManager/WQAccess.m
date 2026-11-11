@@ -2128,7 +2128,8 @@ BOOL wq_stat(NSString *path, struct stat *st)
     return NO;
 }
 
-WQMeasureResult wq_measure_tree(NSString *dir, WQScanCancellation *cancellation, unsigned long long *bytes)
+WQMeasureResult wq_measure_tree_budgeted(NSString *dir, WQScanCancellation *cancellation,
+                                         unsigned long long *bytes, WQMeasureBudget budget)
 {
     if (cancellation.isCancelled) return WQMeasureResultCancelled;
     struct stat st = {0};
@@ -2155,8 +2156,20 @@ WQMeasureResult wq_measure_tree(NSString *dir, WQScanCancellation *cancellation,
     if (!enumerator) return WQMeasureResultLimited;
 
     unsigned long long total = 0;
+    unsigned long entries = 0;
+    CFAbsoluteTime started = CFAbsoluteTimeGetCurrent();
     for (NSURL *item in enumerator) {
         if (cancellation.isCancelled) return WQMeasureResultCancelled;
+        entries++;
+        if (budget.maxEntries > 0 && entries >= budget.maxEntries) {
+            if (bytes) *bytes = total;
+            return WQMeasureResultBudgetExceeded;
+        }
+        if (budget.maxSeconds > 0 && (entries & 0x3F) == 0 &&
+            CFAbsoluteTimeGetCurrent() - started >= budget.maxSeconds) {
+            if (bytes) *bytes = total;
+            return WQMeasureResultBudgetExceeded;
+        }
         NSNumber *isLink = nil, *isRegular = nil, *size = nil;
         NSError *error = nil;
         if (![item getResourceValue:&isLink forKey:NSURLIsSymbolicLinkKey error:&error] ||
@@ -2174,6 +2187,12 @@ WQMeasureResult wq_measure_tree(NSString *dir, WQScanCancellation *cancellation,
     if (cancellation.isCancelled) return WQMeasureResultCancelled;
     if (bytes) *bytes = total;
     return limited ? WQMeasureResultLimited : WQMeasureResultKnown;
+}
+
+WQMeasureResult wq_measure_tree(NSString *dir, WQScanCancellation *cancellation, unsigned long long *bytes)
+{
+    WQMeasureBudget unlimited = {0, 0};
+    return wq_measure_tree_budgeted(dir, cancellation, bytes, unlimited);
 }
 
 static BOOL wq_directory_current(NSString *path, int fd)

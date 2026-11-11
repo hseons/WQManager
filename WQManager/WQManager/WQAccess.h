@@ -131,13 +131,24 @@ typedef NS_ENUM(NSInteger, WQMeasureResult) {
     WQMeasureResultKnown,
     WQMeasureResultLimited,
     WQMeasureResultCancelled,
+    WQMeasureResultBudgetExceeded,
 };
+
+typedef struct {
+    unsigned long maxEntries;   // 0 = unlimited
+    double maxSeconds;          // 0 = unlimited
+} WQMeasureBudget;
 
 // Total byte size of regular files below dir. A missing directory is Missing
 // (size 0); an unreadable subtree makes the result Limited instead of silently
 // undercounting. Grants access when the root cannot be listed.
 WQMeasureResult wq_measure_tree(NSString *dir, WQScanCancellation *_Nullable cancellation,
                                 unsigned long long *_Nullable bytes);
+
+// Same walk, but stops early when the entry or time budget is exhausted and
+// returns WQMeasureResultBudgetExceeded with the partial size in *bytes.
+WQMeasureResult wq_measure_tree_budgeted(NSString *dir, WQScanCancellation *_Nullable cancellation,
+                                         unsigned long long *_Nullable bytes, WQMeasureBudget budget);
 
 // Deletes every item *inside* dir (dir itself stays). No backup — for caches.
 // Adds freed bytes to *freed. A missing dir counts as done; NO if dir cannot

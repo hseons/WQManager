@@ -24,6 +24,9 @@ semantic versioning once it reaches 1.0.
 
 - Large scans no longer keep one sandbox extension per app; the scanner drops
   each token right after measuring, avoiding LRU churn past 192 grants.
+- Scans no longer stall on a single huge or badly fragmented container: the
+  quick pass budgets each tree (12,000 entries / 0.25 s) and deferred apps are
+  measured afterwards with their own progress, so the app count keeps moving.
 
 ## [0.2.0] — 2026-11-11
 

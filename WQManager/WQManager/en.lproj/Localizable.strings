@@ -341,6 +341,7 @@
 "SCAN_FIXTURE_STATUS" = "%lu Apps · UI fixture data";
 "SCAN_LIMITED_STATUS" = "%lu Apps · Access, identity, or size is restricted for %lu items";
 "SCAN_READING_NAMES" = "Reading app names…";
+"SCAN_DEFERRED_PROGRESS" = "Measuring large apps %lu/%lu…";
 "SCAN_READING_PROGRESS" = "Reading %lu/%lu…";
 "SELECTED" = "Selected";
 "SIZE_UNKNOWN" = "Size unknown";

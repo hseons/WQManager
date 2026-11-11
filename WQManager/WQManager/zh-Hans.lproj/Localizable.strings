@@ -341,6 +341,7 @@
 "SCAN_FIXTURE_STATUS" = "%lu 个 App · UI 测试数据";
 "SCAN_LIMITED_STATUS" = "%lu 个 App · %lu 个项目的访问、身份或大小受限";
 "SCAN_READING_NAMES" = "正在读取 App 名称…";
+"SCAN_DEFERRED_PROGRESS" = "正在统计大型 App %lu/%lu…";
 "SCAN_READING_PROGRESS" = "正在读取 %lu/%lu…";
 "SELECTED" = "已选择";
 "SIZE_UNKNOWN" = "大小未知";
