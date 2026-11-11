@@ -70,6 +70,15 @@
 "GITHUB_REPOSITORY" = "GitHub Repository";
 "MINIMUM_OS" = "Minimum OS";
 "DEVELOPMENT_FOOTER" = "WQManager %@ is a development preview.";
+"SETTINGS_CHECK_UPDATE" = "Check for Updates";
+"SETTINGS_CHECK_UPDATE_SUB" = "Current %@";
+"UPDATE_AVAILABLE_TITLE" = "Update available: %@";
+"UPDATE_AVAILABLE_MESSAGE" = "You have %@. Open GitHub to view the new version?";
+"UPDATE_UP_TO_DATE_TITLE" = "You're Up to Date";
+"UPDATE_UP_TO_DATE_MESSAGE" = "Version %@ is the latest.";
+"UPDATE_FAILED_TITLE" = "Check Failed";
+"UPDATE_FAILED_MESSAGE" = "Couldn't reach GitHub. Please try again later.";
+"UPDATE_OPEN" = "View";
 "SETTINGS_ABOUT" = "About";
 "SETTINGS_GITHUB_SUBTITLE" = "Give it a star～";
 "DOC_NOT_FOUND" = "Documentation resource not found.";

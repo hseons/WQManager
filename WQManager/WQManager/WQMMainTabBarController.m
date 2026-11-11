@@ -53,7 +53,7 @@
 
     self.viewControllers = @[apps, backups, cleaner, history, settings];
     self.delegate = self;
-    self.tabBar.tintColor = [WQMTheme accentColor];
+    self.tabBar.tintColor = [WQMTheme highlightColor];
     self.tabBar.unselectedItemTintColor = WQMTheme.textSecondaryColor;
     self.view.backgroundColor = WQMTheme.canvasColor;
     for (UINavigationController *navigation in self.viewControllers) {

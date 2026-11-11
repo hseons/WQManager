@@ -14,6 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (UIColor *)inverseTextColor;
 + (UIColor *)dangerColor;
 + (UIColor *)accentColor;
++ (UIColor *)highlightColor;
 + (UIColor *)warningColor;
 
 + (CGFloat)smallRadius;

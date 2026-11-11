@@ -68,6 +68,12 @@ static UIColor *WQMDynamicColor(UIColor *light, UIColor *dark)
 }
 
 + (UIColor *)accentColor { return self.textPrimaryColor; }
+
++ (UIColor *)highlightColor
+{
+    return WQMDynamicColor([UIColor colorWithRed:0.10 green:0.34 blue:0.24 alpha:1.0],
+                           [UIColor colorWithRed:0.36 green:0.78 blue:0.58 alpha:1.0]);
+}
 + (UIColor *)warningColor { return self.textSecondaryColor; }
 + (CGFloat)smallRadius { return 14.0; }
 + (CGFloat)mediumRadius { return 20.0; }

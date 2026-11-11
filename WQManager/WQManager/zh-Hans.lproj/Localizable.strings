@@ -70,6 +70,15 @@
 "GITHUB_REPOSITORY" = "GitHub 仓库";
 "MINIMUM_OS" = "最低系统";
 "DEVELOPMENT_FOOTER" = "WQManager %@ 为开发预览版本。";
+"SETTINGS_CHECK_UPDATE" = "检测更新";
+"SETTINGS_CHECK_UPDATE_SUB" = "当前 %@";
+"UPDATE_AVAILABLE_TITLE" = "发现新版本 %@";
+"UPDATE_AVAILABLE_MESSAGE" = "当前 %@，是否前往 GitHub 查看？";
+"UPDATE_UP_TO_DATE_TITLE" = "已是最新版本";
+"UPDATE_UP_TO_DATE_MESSAGE" = "当前 %@ 已是最新版本。";
+"UPDATE_FAILED_TITLE" = "检测失败";
+"UPDATE_FAILED_MESSAGE" = "无法连接 GitHub，请稍后重试。";
+"UPDATE_OPEN" = "前往查看";
 "SETTINGS_ABOUT" = "关于";
 "SETTINGS_GITHUB_SUBTITLE" = "给个 star 吧～";
 "DOC_NOT_FOUND" = "文档资源未找到。";
