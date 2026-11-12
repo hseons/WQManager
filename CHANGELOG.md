@@ -6,6 +6,8 @@ semantic versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-12
+
 ### Added
 
 - Settings → About → Telegram Channel: opens
