@@ -214,7 +214,7 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
     if (section == 0) return 4;
     if (section == 1) return 4;
     if (section == 2) return 4;
-    return 1;
+    return 2;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
@@ -294,6 +294,11 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
                    action:@selector(cleanDoubleConfirmToggled:)
          forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = toggle;
+    } else if (indexPath.section == 3 && indexPath.row == 0) {
+        content.text = WQML(@"TELEGRAM_CHANNEL", @"Telegram 频道");
+        content.secondaryText = WQML(@"TELEGRAM_CHANNEL_SUB", @"@TheBallnow · t.me/TheBallnow");
+        content.image = [UIImage systemImageNamed:@"paperplane.fill"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 3) {
         content.text = @"GitHub";
         content.secondaryText = WQML(@"SETTINGS_GITHUB_SUBTITLE", @"给个 star 吧～");
@@ -353,6 +358,11 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
             [self reloadState];
         }]];
         [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    if (indexPath.section == 3 && indexPath.row == 0) {
+        NSURL *url = [NSURL URLWithString:WQM_TELEGRAM_CHANNEL_URL];
+        if (url) [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
         return;
     }
     if (indexPath.section == 3) {

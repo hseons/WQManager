@@ -14,5 +14,6 @@
 #define WQM_REPOSITORY_URL @"https://github.com/" WQM_REPOSITORY_SLUG
 #define WQM_REPOSITORY_RELEASES_URL WQM_REPOSITORY_URL @"/releases"
 #define WQM_REPOSITORY_LATEST_RELEASE_API @"https://api.github.com/repos/" WQM_REPOSITORY_SLUG @"/releases/latest"
+#define WQM_TELEGRAM_CHANNEL_URL @"https://t.me/TheBallnow"
 
 #endif

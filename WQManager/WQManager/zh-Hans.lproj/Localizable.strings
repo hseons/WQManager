@@ -81,6 +81,8 @@
 "UPDATE_OPEN" = "前往查看";
 "SETTINGS_ABOUT" = "关于";
 "SETTINGS_GITHUB_SUBTITLE" = "给个 star 吧～";
+"TELEGRAM_CHANNEL" = "Telegram 频道";
+"TELEGRAM_CHANNEL_SUB" = "@TheBallnow · t.me/TheBallnow";
 "DOC_NOT_FOUND" = "文档资源未找到。";
 "OK" = "确定";
 "CANCEL" = "取消";
