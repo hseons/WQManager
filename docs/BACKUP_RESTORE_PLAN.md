@@ -1,6 +1,7 @@
 # Backup & Restore Load Plan
 
-Status: proposed · Target: 0.3.0 (Phase 1) / 0.3.x (Phase 2)
+Status: Phase 1 implemented on `main` (unreleased) · Target: 0.3.0 (Phase 1) /
+0.3.x (Phase 2)
 Related: [issue #1](https://github.com/hseons/WQManager/issues/1)
 
 ## 1. Problem
@@ -105,27 +106,21 @@ files, matching `fileAttributes.fileSize`.
 
 ### 4.2 Restore: 6 full reads → 5
 
-Introduce a value object so a hash cannot be compared with itself:
-
-```objc
-@interface WQMVerifiedBackup : NSObject
-@property (readonly) NSString *path;
-@property (readonly) NSDictionary<NSString *, NSString *> *partHashes;
-@property (readonly) NSString *manifestFingerprint; // size + mtime + digest
-@property (readonly) NSDate *verifiedAt;
-@end
-```
+`WQMBackupRecord` gains a `manifestFingerprint` — size, mtime, inode and the
+SHA-256 of `manifest.plist`, captured whenever a record is loaded.
 
 - Restore pass 3 now reuses the hashes the safety backup computed while reading
-  back its staging tree. Re-validate cheaply: manifest fingerprint
-  (size + mtime + digest), `Complete`, and that every part directory exists.
-  This is a check of a different artifact, not the same bytes being re-read.
+  back its staging tree. Re-validate cheaply: reload the record and require the
+  fingerprint, bundle ID, parts and `PartHashes` to match the ones returned by
+  the backup service. This is a check of a different artifact, not the same
+  bytes being re-read.
 - Pass 4 (`WQMRestoreTargetMatchesBackup`) and pass 5 stay full verification in
   0.3.0. Pass 4 answers "did the live target change after the safety backup?"
   Reusing the safety hashes there would compare the value with itself; that
   check must never become a tautology.
-- `apply` and `rollback` assert `manifestFingerprint` still matches before they
-  touch the target.
+- `apply` and `rollback` keep their post-copy SHA-256 verification of the
+  target, so a backup that changes after this point fails closed instead of
+  copying mismatched bytes.
 
 Expected: backup heat unchanged per byte but fewer metadata traversals on
 file-heavy apps; restore drops one of six full reads (≈17 %).
@@ -173,8 +168,8 @@ Only when `reduceVerificationPasses` is on:
   before the safety backup) instead of re-reading every byte.
 - Pass 5: `stat`-based manifest fingerprint plus a metadata digest of the
   backup tree captured at first verification, instead of a second full read.
-- `WQMVerifiedBackup` still gates both. Restore becomes **6 → 3 full reads**
-  (initial verify, safety-backup read-back, final target verify).
+- The manifest fingerprint still gates both. Restore becomes **6 → 3 full
+  reads** (initial verify, safety-backup read-back, final target verify).
 
 Trade-off to state in the PR and in the issue: an in-place rewrite that keeps
 inode, mtime, ctime, size and mode identical would no longer be detected. Apps

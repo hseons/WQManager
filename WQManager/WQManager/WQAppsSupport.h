@@ -204,6 +204,130 @@ static inline NSString *WQAppsSupportTreeSignature(NSString *path, BOOL includeI
     return hex;
 }
 
+// One traversal that produces the identity signature, the shape signature and
+// the total regular-file bytes. Byte-identical to calling
+// WQAppsSupportTreeSignature(path, YES) and WQAppsSupportTreeSignature(path, NO)
+// back to back, and to summing WQMBackupTreeSize over the same tree. Callers
+// that need all three should use this instead of walking the tree repeatedly.
+static inline BOOL WQAppsSupportTreeDigests(NSString *path, BOOL *exists,
+                                            NSString **identityOut, NSString **shapeOut,
+                                            unsigned long long *totalBytesOut, NSString **errorOut)
+{
+    struct stat rootStat;
+    if (lstat(path.fileSystemRepresentation, &rootStat) != 0) {
+        if (errno == ENOENT) {
+            if (exists) *exists = NO;
+            if (identityOut) *identityOut = @"<missing>";
+            if (shapeOut) *shapeOut = @"<missing>";
+            if (totalBytesOut) *totalBytesOut = 0;
+            return YES;
+        }
+        if (errorOut) *errorOut = [NSString stringWithFormat:@"Cannot inspect %@", path.lastPathComponent];
+        return NO;
+    }
+    if (!S_ISDIR(rootStat.st_mode)) {
+        if (errorOut) *errorOut = [NSString stringWithFormat:@"%@ is not a directory", path.lastPathComponent];
+        return NO;
+    }
+    NSError *listError = nil;
+    if (![NSFileManager.defaultManager contentsOfDirectoryAtPath:path error:&listError]) {
+        if (errorOut) *errorOut = listError.localizedDescription ?: [NSString stringWithFormat:@"Cannot read %@", path.lastPathComponent];
+        return NO;
+    }
+    if (exists) *exists = YES;
+
+    NSMutableArray<NSString *> *relativePaths = [NSMutableArray new];
+    for (NSString *relative in [NSFileManager.defaultManager enumeratorAtPath:path])
+        [relativePaths addObject:relative];
+    [relativePaths sortUsingSelector:@selector(compare:)];
+
+    CC_SHA256_CTX identityCtx, shapeCtx;
+    CC_SHA256_Init(&identityCtx);
+    CC_SHA256_Init(&shapeCtx);
+    unsigned long long total = 0;
+    for (NSString *relative in relativePaths) {
+        NSString *item = [path stringByAppendingPathComponent:relative];
+        struct stat itemStat;
+        if (lstat(item.fileSystemRepresentation, &itemStat) != 0) {
+            if (errorOut) *errorOut = [NSString stringWithFormat:@"Cannot inspect %@", relative];
+            return NO;
+        }
+        uint64_t itemType = (uint64_t)(itemStat.st_mode & S_IFMT);
+        const char *name = relative.UTF8String;
+        NSUInteger nameLength = name ? strlen(name) : 0;
+        if (!name) {
+            if (errorOut) *errorOut = [NSString stringWithFormat:@"Cannot encode %@", relative];
+            return NO;
+        }
+
+        uint8_t identityTag = 'I';
+        CC_SHA256_Update(&identityCtx, &identityTag, 1);
+        WQAppsSupportHashBlob(&identityCtx, name, nameLength);
+        WQAppsSupportHashU64(&identityCtx, itemType);
+        WQAppsSupportHashU64(&identityCtx, (uint64_t)(itemStat.st_mode & 07777));
+        WQAppsSupportHashU64(&identityCtx, (uint64_t)itemStat.st_ino);
+        WQAppsSupportHashU64(&identityCtx, (uint64_t)itemStat.st_size);
+        WQAppsSupportHashU64(&identityCtx, (uint64_t)itemStat.st_mtimespec.tv_sec);
+        WQAppsSupportHashU64(&identityCtx, (uint64_t)itemStat.st_mtimespec.tv_nsec);
+        WQAppsSupportHashU64(&identityCtx, (uint64_t)itemStat.st_ctimespec.tv_sec);
+        WQAppsSupportHashU64(&identityCtx, (uint64_t)itemStat.st_ctimespec.tv_nsec);
+
+        uint8_t shapeTag = 'S';
+        CC_SHA256_Update(&shapeCtx, &shapeTag, 1);
+        WQAppsSupportHashBlob(&shapeCtx, name, nameLength);
+        WQAppsSupportHashU64(&shapeCtx, itemType);
+        WQAppsSupportHashU64(&shapeCtx, (uint64_t)(itemStat.st_mode & 07777));
+        if (itemType == S_IFREG) {
+            WQAppsSupportHashU64(&shapeCtx, (uint64_t)itemStat.st_size);
+            total += (unsigned long long)itemStat.st_size;
+        } else if (itemType == S_IFLNK) {
+            char target[PATH_MAX];
+            ssize_t length = readlink(item.fileSystemRepresentation, target, sizeof(target) - 1);
+            if (length < 0 || length >= (ssize_t)sizeof(target) - 1) {
+                if (errorOut) *errorOut = [NSString stringWithFormat:@"Cannot inspect link %@", relative];
+                return NO;
+            }
+            WQAppsSupportHashBlob(&shapeCtx, target, (NSUInteger)length);
+        }
+    }
+
+    unsigned char identityDigest[CC_SHA256_DIGEST_LENGTH];
+    unsigned char shapeDigest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256_Final(identityDigest, &identityCtx);
+    CC_SHA256_Final(shapeDigest, &shapeCtx);
+    NSMutableString *identityHex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+    NSMutableString *shapeHex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+    for (NSUInteger i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
+        [identityHex appendFormat:@"%02x", identityDigest[i]];
+        [shapeHex appendFormat:@"%02x", shapeDigest[i]];
+    }
+    if (identityOut) *identityOut = identityHex;
+    if (shapeOut) *shapeOut = shapeHex;
+    if (totalBytesOut) *totalBytesOut = total;
+    return YES;
+}
+
+// Stable identity for a small regular file (the backup manifest): size, mtime,
+// inode and the SHA-256 of its bytes. Comparing two fingerprints detects a
+// manifest that was replaced between "verified" and "trusted".
+static inline NSString *WQAppsSupportFileFingerprint(NSString *path)
+{
+    struct stat st;
+    if (lstat(path.fileSystemRepresentation, &st) != 0 || !S_ISREG(st.st_mode)) return nil;
+    NSData *data = [NSData dataWithContentsOfFile:path];
+    if (!data) return nil;
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(data.bytes, (CC_LONG)data.length, digest);
+    NSMutableString *hex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+    for (NSUInteger i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) [hex appendFormat:@"%02x", digest[i]];
+    return [NSString stringWithFormat:@"%llu:%lld:%ld:%llu:%@",
+            (unsigned long long)st.st_size,
+            (long long)st.st_mtimespec.tv_sec,
+            (long)st.st_mtimespec.tv_nsec,
+            (unsigned long long)st.st_ino,
+            hex];
+}
+
 // Content-level digest for backup verification: metadata plus every regular
 // file's bytes. Reading is streamed; a file that changes while it is hashed
 // fails with an error rather than producing a torn digest.

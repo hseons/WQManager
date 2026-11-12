@@ -149,6 +149,7 @@
 "BACKUP_ERROR_INVALID_SCOPE" = "Invalid backup scope";
 "BACKUP_ERROR_MANIFEST_FIELDS" = "Required backup manifest fields are missing";
 "BACKUP_ERROR_MANIFEST_MISSING" = "The backup manifest is missing or invalid";
+"BACKUP_ERROR_MANIFEST_UNREADABLE" = "The backup manifest cannot be read";
 "BACKUP_ERROR_MISSING_HASH" = "%@ is missing a content hash";
 "BACKUP_ERROR_MISSING_PART" = "The backup is missing the %@ directory";
 "BACKUP_ERROR_NO_ACCESS" = "The app is missing valid access or container identity";

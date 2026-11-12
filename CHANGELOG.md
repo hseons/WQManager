@@ -11,6 +11,16 @@ semantic versioning once it reaches 1.0.
 - Settings → About → Telegram Channel: opens
   [t.me/TheBallnow](https://t.me/TheBallnow).
 
+### Changed
+
+- Backup computes the directory identity, the structure signature and the byte
+  total in one tree walk, and no longer re-walks the source after copying
+  (6 → 4 metadata passes; the single data read is unchanged).
+- Restore reuses the hashes the safety backup already computed during its
+  read-back instead of hashing the safety backup a second time (6 → 5 full
+  reads). The source verification, target check and post-copy verification are
+  unchanged.
+
 ## [0.2.1] — 2026-11-11
 
 ### Added

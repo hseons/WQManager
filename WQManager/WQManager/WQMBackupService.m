@@ -12,18 +12,6 @@
 static NSString *const kWQMBackupManifestName = @"manifest.plist";
 static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
 
-static unsigned long long WQMBackupTreeSize(NSString *root)
-{
-    unsigned long long total = 0;
-    NSDirectoryEnumerator<NSString *> *enumerator =
-        [NSFileManager.defaultManager enumeratorAtPath:root];
-    for (NSString *__unused relative in enumerator) {
-        NSDictionary *attributes = [enumerator fileAttributes];
-        if ([attributes.fileType isEqualToString:NSFileTypeRegular]) total += attributes.fileSize;
-    }
-    return total;
-}
-
 @implementation WQMBackupService
 
 - (void)backupApp:(WQMAppModel *)app
@@ -123,6 +111,7 @@ static unsigned long long WQMBackupTreeSize(NSString *root)
         NSMutableArray<NSString *> *parts = [NSMutableArray new];
         NSMutableDictionary<NSString *, NSString *> *hashes = [NSMutableDictionary new];
         NSMutableDictionary<NSString *, NSString *> *sourceStates = [NSMutableDictionary new];
+        unsigned long long totalBytes = 0;
         NSString *failure = nil;
 
         for (NSString *part in descriptor.relativePaths) {
@@ -143,8 +132,10 @@ static unsigned long long WQMBackupTreeSize(NSString *root)
                 }
 
                 BOOL sourceExists = NO;
-                NSString *sourceState = WQAppsSupportTreeSignature(source, YES, &sourceExists, &failure);
-                if (!sourceState || !sourceExists) {
+                NSString *sourceState = nil;
+                NSString *sourceShape = nil;
+                if (!WQAppsSupportTreeDigests(source, &sourceExists, &sourceState, &sourceShape, NULL, &failure) ||
+                    !sourceExists) {
                     failure = failure ?: [NSString stringWithFormat:
                                           WQML(@"BACKUP_ERROR_VERIFY_PART", @"无法验证 %@"), part];
                     break;
@@ -158,13 +149,20 @@ static unsigned long long WQMBackupTreeSize(NSString *root)
                     break;
                 }
 
+                // The identity comparison below proves the source did not change
+                // while it was copied, so the pre-copy shape remains the shape to
+                // compare against the destination. Doing the shape and byte count
+                // in the destination walk removes two more full-tree passes.
                 BOOL sourceAfterExists = NO;
                 NSString *sourceAfter = WQAppsSupportTreeSignature(source, YES, &sourceAfterExists, &failure);
                 BOOL destinationExists = NO;
-                NSString *sourceShape = WQAppsSupportTreeSignature(source, NO, NULL, &failure);
-                NSString *destinationShape = WQAppsSupportTreeSignature(destination, NO,
-                                                                         &destinationExists, &failure);
-                if (!sourceAfter || !sourceAfterExists || !sourceShape || !destinationShape || !destinationExists ||
+                NSString *destinationShape = nil;
+                unsigned long long destinationBytes = 0;
+                BOOL destinationDigestsOK = WQAppsSupportTreeDigests(destination, &destinationExists, NULL,
+                                                                     &destinationShape, &destinationBytes,
+                                                                     &failure);
+                if (!destinationDigestsOK || !sourceAfter || !sourceAfterExists ||
+                    !destinationShape || !destinationExists ||
                     ![sourceState isEqualToString:sourceAfter] ||
                     ![sourceShape isEqualToString:destinationShape]) {
                     failure = failure ?: [NSString stringWithFormat:
@@ -172,6 +170,7 @@ static unsigned long long WQMBackupTreeSize(NSString *root)
                                                @"%@ 在复制过程中发生变化或复制不完整"), part];
                     break;
                 }
+                totalBytes += destinationBytes;
 
                 BOOL stagedExists = NO;
                 report([NSString stringWithFormat:
@@ -201,7 +200,6 @@ static unsigned long long WQMBackupTreeSize(NSString *root)
         }
 
         NSString *systemVersion = NSProcessInfo.processInfo.operatingSystemVersionString ?: @"unknown";
-        unsigned long long totalBytes = WQMBackupTreeSize(staging);
         NSDictionary *manifest = @{
             @"Complete": @YES,
             @"Format": @2,

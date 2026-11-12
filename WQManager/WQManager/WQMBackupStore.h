@@ -17,6 +17,10 @@ extern NSNotificationName const WQMBackupStoreDidChangeNotification;
 @property (nonatomic, copy) NSString *systemVersion;
 @property (nonatomic, strong) NSDate *createdAt;
 @property (nonatomic) unsigned long long totalBytes;
+// Size/mtime/inode/digest of the manifest captured when this record was loaded.
+// Restore compares it against a fresh load to reuse the safety backup's hashes
+// without re-reading every part.
+@property (nonatomic, copy, nullable) NSString *manifestFingerprint;
 
 - (instancetype)init NS_UNAVAILABLE;
 + (instancetype)new NS_UNAVAILABLE;

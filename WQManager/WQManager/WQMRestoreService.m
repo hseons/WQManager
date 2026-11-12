@@ -127,6 +127,35 @@ static BOOL WQMRestoreVerifyBackup(WQMBackupRecord *record, NSString **reason)
     return YES;
 }
 
+// The safety backup was hashed by WQMBackupService while it read the staged
+// tree back, so its PartHashes are already verified. Re-reading every part here
+// would duplicate that work; instead prove the record still describes the files
+// on disk by reloading the manifest and comparing its fingerprint, bundle ID,
+// parts and hashes.
+static BOOL WQMRestoreSafetyBackupIntact(WQMBackupRecord *record, NSString **reason)
+{
+    NSString *root = [WQMBackupStore backupRoot].stringByStandardizingPath;
+    NSString *path = record.path.stringByStandardizingPath;
+    if (!record.manifestFingerprint ||
+        ![path hasPrefix:[root stringByAppendingString:@"/"]]) {
+        if (reason) *reason = WQML(@"RESTORE_ERROR_BACKUP_OUTSIDE_ROOT",
+                                   @"备份不在 WQManager 的备份目录内");
+        return NO;
+    }
+    NSString *loadError = nil;
+    WQMBackupRecord *fresh = [WQMBackupRecord recordAtPath:path error:&loadError];
+    if (!fresh ||
+        ![fresh.manifestFingerprint isEqualToString:record.manifestFingerprint] ||
+        ![fresh.bundleIdentifier isEqualToString:record.bundleIdentifier] ||
+        ![fresh.parts isEqualToArray:record.parts] ||
+        ![fresh.partHashes isEqualToDictionary:record.partHashes]) {
+        if (reason) *reason = loadError ?: WQML(@"RESTORE_ERROR_BACKUP_CHANGED",
+                                                @"备份清单已变化或无效");
+        return NO;
+    }
+    return YES;
+}
+
 static BOOL WQMRestoreApply(NSString *container, NSArray<NSString *> *requestedParts,
                             WQMBackupRecord *source, NSString **reason)
 {
@@ -309,7 +338,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
             [WQMOperationStore updateRecord:operation];
             dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
                 NSString *validation = nil;
-                if (!WQMRestoreVerifyBackup(safety, &validation)) {
+                if (!WQMRestoreSafetyBackupIntact(safety, &validation)) {
                     finish(NO, [NSString stringWithFormat:
                                 WQML(@"RESTORE_ERROR_SAFETY_VALIDATION",
                                      @"安全备份校验失败，未修改目标 App。%@"),

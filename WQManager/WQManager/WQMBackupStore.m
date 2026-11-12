@@ -86,7 +86,14 @@ static NSArray<NSString *> *WQMCanonicalParts(NSArray<NSString *> *parts)
         }
     }
 
+    NSString *fingerprint = WQAppsSupportFileFingerprint(manifestPath);
+    if (!fingerprint) {
+        if (error) *error = WQML(@"BACKUP_ERROR_MANIFEST_UNREADABLE", @"备份清单无法读取");
+        return nil;
+    }
+
     WQMBackupRecord *record = [WQMBackupRecord new];
+    record.manifestFingerprint = fingerprint;
     record.path = path;
     record.bundleIdentifier = bundleID;
     record.displayName = [manifest[@"DisplayName"] isKindOfClass:NSString.class]

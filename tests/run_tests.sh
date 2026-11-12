@@ -39,6 +39,17 @@ clang \
   -fblocks \
   -I"$SOURCE_DIR" \
   -framework Foundation \
+  -framework CoreFoundation \
+  "$ROOT/tests/WQMSupportDigestTests.m" \
+  -o "$OUTPUT_DIR/WQMSupportDigestTests"
+
+"$OUTPUT_DIR/WQMSupportDigestTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
   "$SOURCE_DIR/WQMLanguageManager.m" \
   "$SOURCE_DIR/WQMOperationStore.m" \
   "$ROOT/tests/WQMOperationStoreTests.m" \

@@ -45,6 +45,10 @@ int main(void)
         WQMAssert([record.parts isEqualToArray:@[@"Documents"]], @"parts should round-trip");
         WQMAssert([record.scopeCode isEqualToString:@"quick"], @"scope code should round-trip");
         WQMAssert(record.totalBytes == 7, @"backup size should come from the manifest");
+        WQMAssert(record.manifestFingerprint.length > 0, @"manifest fingerprint should be captured");
+        WQMAssert([record.manifestFingerprint isEqualToString:
+                   [WQMBackupRecord recordAtPath:backup error:nil].manifestFingerprint],
+                  @"manifest fingerprint should be stable across reloads");
 
         NSString *unexpected = [backup stringByAppendingPathComponent:@"Unexpected"];
         [fm createDirectoryAtPath:unexpected withIntermediateDirectories:NO attributes:nil error:nil];
