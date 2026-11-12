@@ -13,6 +13,10 @@ semantic versioning once it reaches 1.0.
   pressure and pauses while it is critical; Low-load always runs at a slower
   fixed pace.
 - Backup and restore confirmations show the profile that will be used.
+- Long backup, restore, import, export, recovery, delete and clean operations
+  now report through a floating capsule below the status bar instead of a
+  blocking alert. Tap the capsule for details; the rest of the app stays
+  usable while the operation runs.
 
 ### Changed
 

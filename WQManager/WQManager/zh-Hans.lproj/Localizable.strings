@@ -397,3 +397,7 @@
 "LOAD_PROFILE_STANDARD" = "标准";
 "LOAD_PROFILE_LOWLOAD" = "低负载";
 "LOAD_PROFILE_CONFIRM" = "负载模式：%@";
+
+"OPERATION_BUSY_TITLE" = "有操作正在进行";
+"OPERATION_BUSY_MESSAGE" = "请等待当前操作完成后再试。";
+"LONG_OPERATION_TAP_HINT" = "轻点查看详情";

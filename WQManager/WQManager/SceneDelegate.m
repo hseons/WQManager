@@ -12,6 +12,9 @@
 #import "WQMMainTabBarController.h"
 #import "WQMSharedInbox.h"
 #import "WQMTheme.h"
+#if DEBUG
+#import "WQMLongOperationBanner.h"
+#endif
 
 @interface SceneDelegate ()
 
@@ -35,6 +38,17 @@
                                              object:nil];
     [self showLegalGateIfNeeded];
     [window makeKeyAndVisible];
+#if DEBUG
+    if (getenv("WQM_BANNER_DEMO")) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [WQMLongOperationBanner.shared
+                showWithTitle:WQML(@"RESTORE_PROGRESS_TITLE", @"正在恢复")
+                       status:WQML(@"IMPORT_VERIFYING", @"校验备份包…")
+                cancelHandler:^{}];
+        });
+    }
+#endif
     [self enqueueImportFromURLContexts:connectionOptions.URLContexts];
     [self enqueuePendingSharedInbox];
 }

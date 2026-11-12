@@ -1,6 +1,8 @@
 #import "WQMBackupsViewController.h"
 #import "WQMBackupArchiveService.h"
 #import "WQMBackupStore.h"
+#import "WQMLongOperationBanner.h"
+#import "WQMAlertPresenter.h"
 #import "WQMLanguageManager.h"
 #import "WQMRestoreService.h"
 #import "WQMSafetyPolicy.h"
@@ -338,14 +340,16 @@ static NSString *WQMBackupReasonText(NSString *reason)
     [self loadViewIfNeeded];
     _importing = YES;
     void (^startImport)(void) = ^{
-        UIAlertController *progress = [UIAlertController
-            alertControllerWithTitle:WQML(@"IMPORT_PROGRESS_TITLE", @"正在导入")
-                             message:WQML(@"IMPORT_VERIFYING", @"校验备份包…")
-                      preferredStyle:UIAlertControllerStyleAlert];
-        [self presentViewController:progress animated:YES completion:nil];
+        if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"IMPORT_PROGRESS_TITLE", @"正在导入")
+                                                      status:WQML(@"IMPORT_VERIFYING", @"校验备份包…")
+                                               cancelHandler:nil]) {
+            self->_importing = NO;
+            return;
+        }
+        WQMLongOperationBanner *banner = WQMLongOperationBanner.shared;
         [self->_archiveService importBackupAtURL:url completion:^(WQMBackupRecord *backup, NSError *error) {
             self->_importing = NO;
-            [progress dismissViewControllerAnimated:YES completion:^{
+            [banner hideWithCompletion:^{
                 [self reloadBackups];
                 UIAlertController *result = [UIAlertController
                     alertControllerWithTitle:error
@@ -357,7 +361,7 @@ static NSString *WQMBackupReasonText(NSString *reason)
                               preferredStyle:UIAlertControllerStyleAlert];
                 [result addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"确定")
                                                            style:UIAlertActionStyleDefault handler:nil]];
-                [self presentViewController:result animated:YES completion:nil];
+                [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
             }];
         }];
     };
@@ -443,14 +447,14 @@ static NSString *WQMBackupReasonText(NSString *reason)
 
 - (void)runRecovery
 {
-    UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"RECOVERY_PROGRESS_TITLE", @"正在修复")
-                                                                      message:WQML(@"PREPARING", @"准备中…")
-                                                               preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:progress animated:YES completion:nil];
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"RECOVERY_PROGRESS_TITLE", @"正在修复")
+                                                  status:WQML(@"PREPARING", @"准备中…")
+                                           cancelHandler:nil]) return;
+    WQMLongOperationBanner *banner = WQMLongOperationBanner.shared;
     [WQMRestoreService recoverActiveRecoveryWithProgress:^(NSString *status) {
-        progress.message = status;
+        [banner updateStatus:status];
     } completion:^(BOOL success, NSString *message, NSError *error) {
-        [progress dismissViewControllerAnimated:YES completion:^{
+        [banner hideWithCompletion:^{
             self->_recoveryPrompted = YES;
             [self reloadBackups];
             UIAlertController *result = [UIAlertController
@@ -461,7 +465,7 @@ static NSString *WQMBackupReasonText(NSString *reason)
                           preferredStyle:UIAlertControllerStyleAlert];
             [result addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"确定")
                                                        style:UIAlertActionStyleDefault handler:nil]];
-            [self presentViewController:result animated:YES completion:nil];
+            [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
         }];
     }];
 }
@@ -566,19 +570,19 @@ static NSString *WQMBackupReasonText(NSString *reason)
 
 - (void)exportBackup:(WQMBackupRecord *)backup
 {
-    UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"EXPORT_PROGRESS_TITLE", @"正在准备导出")
-                                                                      message:WQML(@"EXPORT_PROGRESS_MESSAGE", @"校验并复制备份包…")
-                                                               preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:progress animated:YES completion:nil];
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"EXPORT_PROGRESS_TITLE", @"正在准备导出")
+                                                  status:WQML(@"EXPORT_PROGRESS_MESSAGE", @"校验并复制备份包…")
+                                           cancelHandler:nil]) return;
+    WQMLongOperationBanner *banner = WQMLongOperationBanner.shared;
     [_archiveService prepareExportForBackup:backup completion:^(NSURL *exportURL, NSError *error) {
-        [progress dismissViewControllerAnimated:YES completion:^{
+        [banner hideWithCompletion:^{
             if (!exportURL) {
                 UIAlertController *alert = [UIAlertController
                     alertControllerWithTitle:WQML(@"EXPORT_FAILED_TITLE", @"导出失败")
                                      message:error.localizedDescription
                               preferredStyle:UIAlertControllerStyleAlert];
                 [alert addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"确定") style:UIAlertActionStyleDefault handler:nil]];
-                [self presentViewController:alert animated:YES completion:nil];
+                [WQMAlertPresenter presentViewController:alert animated:YES completion:nil];
                 return;
             }
             self->_temporaryExportURL = exportURL;
@@ -593,7 +597,7 @@ static NSString *WQMBackupReasonText(NSString *reason)
                 __strong typeof(weakSelf) self = weakSelf;
                 self->_temporaryExportURL = nil;
             };
-            [self presentViewController:share animated:YES completion:nil];
+            [WQMAlertPresenter presentViewController:share animated:YES completion:nil];
         }];
     }];
 }
@@ -632,12 +636,11 @@ static NSString *WQMBackupReasonText(NSString *reason)
         [final addAction:[UIAlertAction actionWithTitle:WQML(@"DELETE_PERMANENTLY", @"永久删除") style:UIAlertActionStyleDestructive
                                                 handler:^(__unused UIAlertAction *a) {
             if (![self->_deleteGate authorizeExecutionForOperation:operation]) return;
-            UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"DELETE_PROGRESS_TITLE", @"正在删除")
-                                                                              message:nil
-                                                                       preferredStyle:UIAlertControllerStyleAlert];
-            [self presentViewController:progress animated:YES completion:nil];
+            if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"DELETE_PROGRESS_TITLE", @"正在删除")
+                                                          status:nil
+                                                   cancelHandler:nil]) return;
             [self->_archiveService deleteBackup:backup completion:^(BOOL success, NSError *error) {
-                [progress dismissViewControllerAnimated:YES completion:^{
+                [WQMLongOperationBanner.shared hideWithCompletion:^{
                     [self reloadBackups];
                     UIAlertController *result = [UIAlertController
                         alertControllerWithTitle:success
@@ -647,7 +650,7 @@ static NSString *WQMBackupReasonText(NSString *reason)
                                   preferredStyle:UIAlertControllerStyleAlert];
                     [result addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"确定")
                                                                style:UIAlertActionStyleDefault handler:nil]];
-                    [self presentViewController:result animated:YES completion:nil];
+                    [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
                 }];
             }];
         }]];
@@ -657,4 +660,3 @@ static NSString *WQMBackupReasonText(NSString *reason)
 }
 
 @end
-

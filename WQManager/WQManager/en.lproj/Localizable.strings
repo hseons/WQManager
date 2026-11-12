@@ -397,3 +397,7 @@
 "LOAD_PROFILE_STANDARD" = "Standard";
 "LOAD_PROFILE_LOWLOAD" = "Low-load";
 "LOAD_PROFILE_CONFIRM" = "Load profile: %@";
+
+"OPERATION_BUSY_TITLE" = "Operation in progress";
+"OPERATION_BUSY_MESSAGE" = "Please wait for the current operation to finish.";
+"LONG_OPERATION_TAP_HINT" = "Tap for details";

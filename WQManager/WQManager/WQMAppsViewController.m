@@ -9,6 +9,8 @@
 #import "WQMLanguageManager.h"
 #import "WQMRestoreService.h"
 #import "WQMLoadController.h"
+#import "WQMLongOperationBanner.h"
+#import "WQMAlertPresenter.h"
 #import "WQMSafetyPolicy.h"
 #import "WQMTheme.h"
 #import "WQAccess.h"
@@ -872,17 +874,17 @@ static NSString *WQMLoadProfileConfirmationLine(void)
 
 - (void)startRestoreBackup:(WQMBackupRecord *)backup app:(WQMAppModel *)app
 {
-    UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"RESTORE_PROGRESS_TITLE", @"正在恢复")
-                                                                      message:WQML(@"PREPARING", @"准备中…")
-                                                               preferredStyle:UIAlertControllerStyleAlert];
+    WQMLongOperationBanner *banner = WQMLongOperationBanner.shared;
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"RESTORE_PROGRESS_TITLE", @"正在恢复")
+                                                  status:WQML(@"PREPARING", @"准备中…")
+                                           cancelHandler:nil]) return;
     [UIApplication sharedApplication].idleTimerDisabled = YES;
-    [self presentViewController:progress animated:YES completion:nil];
     WQMRestoreService *service = [WQMRestoreService new];
     [service restoreBackup:backup toApp:app progress:^(NSString *status) {
-        progress.message = status;
+        [banner updateStatus:status];
     } completion:^(BOOL success, NSString *message, NSError *error) {
         [UIApplication sharedApplication].idleTimerDisabled = NO;
-        [progress dismissViewControllerAnimated:YES completion:^{
+        [banner hideWithCompletion:^{
             UIAlertController *result = [UIAlertController
                 alertControllerWithTitle:success
                     ? WQML(@"RESTORE_COMPLETE_TITLE", @"恢复完成")
@@ -895,7 +897,7 @@ static NSString *WQMLoadProfileConfirmationLine(void)
                                                      handler:^(__unused UIAlertAction *a) {
                 [weakSelf scan];
             }]];
-            [self presentViewController:result animated:YES completion:nil];
+            [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
         }];
     }];
 }
@@ -923,18 +925,18 @@ static NSString *WQMLoadProfileConfirmationLine(void)
 
 - (void)startBackupForApp:(WQMAppModel *)app scope:(WQMBackupScopeDescriptor *)scope
 {
-    UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_PROGRESS_TITLE", @"正在备份")
-                                                                      message:WQML(@"PREPARING", @"准备中…")
-                                                               preferredStyle:UIAlertControllerStyleAlert];
+    WQMLongOperationBanner *banner = WQMLongOperationBanner.shared;
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"BACKUP_PROGRESS_TITLE", @"正在备份")
+                                                  status:WQML(@"PREPARING", @"准备中…")
+                                           cancelHandler:nil]) return;
     [UIApplication sharedApplication].idleTimerDisabled = YES;
-    [self presentViewController:progress animated:YES completion:nil];
 
     WQMBackupService *service = [WQMBackupService new];
     [service backupApp:app scope:scope.scope reason:@"" progress:^(NSString *status) {
-        progress.message = status;
+        [banner updateStatus:status];
     } completion:^(WQMBackupRecord *backup, NSError *error) {
         [UIApplication sharedApplication].idleTimerDisabled = NO;
-        [progress dismissViewControllerAnimated:YES completion:^{
+        [banner hideWithCompletion:^{
             UIAlertController *result = [UIAlertController
                 alertControllerWithTitle:error
                     ? WQML(@"BACKUP_FAILED_TITLE", @"备份失败")
@@ -946,7 +948,7 @@ static NSString *WQMLoadProfileConfirmationLine(void)
             [result addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"确定")
                                                        style:UIAlertActionStyleDefault
                                                      handler:nil]];
-            [self presentViewController:result animated:YES completion:nil];
+            [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
         }];
     }];
 }

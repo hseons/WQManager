@@ -6,6 +6,8 @@
 #import "WQMSafetyPolicy.h"
 #import "WQMTheme.h"
 #import "WQAccess.h"
+#import "WQMLongOperationBanner.h"
+#import "WQMAlertPresenter.h"
 
 #import <math.h>
 
@@ -1463,27 +1465,28 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
 - (void)cleanItems:(NSArray<WQMCleanItem *> *)items
 {
     WQScanCancellation *cancellation = [WQScanCancellation new];
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"CLEAN_PROGRESS_TITLE", @"正在清理")
+                                                  status:WQML(@"PREPARING", @"准备中…")
+                                           cancelHandler:^{ [cancellation cancel]; }]) {
+        return;
+    }
+    WQMLongOperationBanner *banner = WQMLongOperationBanner.shared;
     _cleanCancellation = cancellation;
     _cleaning = YES;
     [self updateNavigation];
-    UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"CLEAN_PROGRESS_TITLE", @"正在清理")
-                                                                      message:WQML(@"PREPARING", @"准备中…")
-                                                               preferredStyle:UIAlertControllerStyleAlert];
-    [progress addAction:[UIAlertAction actionWithTitle:WQML(@"STOP", @"停止") style:UIAlertActionStyleCancel
-                                               handler:^(__unused UIAlertAction *action) {
-        [cancellation cancel];
-    }]];
-    [self presentViewController:progress animated:YES completion:nil];
     WQMCacheService *service = [WQMCacheService new];
     __weak typeof(self) weakSelf = self;
     [service cleanItems:items cancellation:cancellation progress:^(NSString *status) {
-        progress.message = status;
+        [banner updateStatus:status];
     } completion:^(unsigned long long freed, NSUInteger cleanedCount, NSUInteger failedCount, BOOL cancelled) {
         __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
+        if (!self) {
+            [banner hide];
+            return;
+        }
         self->_cleaning = NO;
         self->_cleanCancellation = nil;
-        [progress dismissViewControllerAnimated:YES completion:^{
+        [banner hideWithCompletion:^{
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
             [strongSelf scan];
@@ -1499,10 +1502,9 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
                           preferredStyle:UIAlertControllerStyleAlert];
             [result addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"确定")
                                                        style:UIAlertActionStyleDefault handler:nil]];
-            [strongSelf presentViewController:result animated:YES completion:nil];
+            [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
         }];
     }];
 }
 
 @end
-
