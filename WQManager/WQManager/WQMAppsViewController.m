@@ -8,9 +8,27 @@
 #import "WQMBackupStore.h"
 #import "WQMLanguageManager.h"
 #import "WQMRestoreService.h"
+#import "WQMLoadController.h"
 #import "WQMSafetyPolicy.h"
 #import "WQMTheme.h"
 #import "WQAccess.h"
+
+static NSString *WQMLoadProfileName(WQMLoadProfile profile)
+{
+    switch (profile) {
+        case WQMLoadProfileStandard: return WQML(@"LOAD_PROFILE_STANDARD", @"标准");
+        case WQMLoadProfileLowLoad: return WQML(@"LOAD_PROFILE_LOWLOAD", @"低负载");
+        case WQMLoadProfileAutomatic:
+        default: return WQML(@"LOAD_PROFILE_AUTOMATIC", @"自动");
+    }
+}
+
+static NSString *WQMLoadProfileConfirmationLine(void)
+{
+    return [NSString stringWithFormat:@"\n\n%@",
+            [NSString stringWithFormat:WQML(@"LOAD_PROFILE_CONFIRM", @"负载模式：%@"),
+             WQMLoadProfileName(WQMLoadProfileCurrent())]];
+}
 
 @interface WQMAppsSummaryView : UIView
 
@@ -784,6 +802,7 @@
                          app.displayName, app.bundleIdentifier,
                          [backup.parts componentsJoinedByString:WQML(@"LIST_SEPARATOR", @"、")],
                          backup.path];
+    message = [message stringByAppendingString:WQMLoadProfileConfirmationLine()];
     UIAlertController *scopeAlert = [UIAlertController
         alertControllerWithTitle:WQML(@"RESTORE_SCOPE_TITLE", @"恢复范围确认")
                          message:message preferredStyle:UIAlertControllerStyleAlert];
@@ -856,11 +875,13 @@
     UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"RESTORE_PROGRESS_TITLE", @"正在恢复")
                                                                       message:WQML(@"PREPARING", @"准备中…")
                                                                preferredStyle:UIAlertControllerStyleAlert];
+    [UIApplication sharedApplication].idleTimerDisabled = YES;
     [self presentViewController:progress animated:YES completion:nil];
     WQMRestoreService *service = [WQMRestoreService new];
     [service restoreBackup:backup toApp:app progress:^(NSString *status) {
         progress.message = status;
     } completion:^(BOOL success, NSString *message, NSError *error) {
+        [UIApplication sharedApplication].idleTimerDisabled = NO;
         [progress dismissViewControllerAnimated:YES completion:^{
             UIAlertController *result = [UIAlertController
                 alertControllerWithTitle:success
@@ -887,6 +908,7 @@
                                "这不是文件系统快照，运行中的数据可能导致备份失败。"),
                          scope.title, scope.detail,
                          [scope.relativePaths componentsJoinedByString:@", "]];
+    message = [message stringByAppendingString:WQMLoadProfileConfirmationLine()];
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_CONFIRM_TITLE", @"开始备份？")
                                                                    message:message
                                                             preferredStyle:UIAlertControllerStyleAlert];
@@ -904,12 +926,14 @@
     UIAlertController *progress = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_PROGRESS_TITLE", @"正在备份")
                                                                       message:WQML(@"PREPARING", @"准备中…")
                                                                preferredStyle:UIAlertControllerStyleAlert];
+    [UIApplication sharedApplication].idleTimerDisabled = YES;
     [self presentViewController:progress animated:YES completion:nil];
 
     WQMBackupService *service = [WQMBackupService new];
     [service backupApp:app scope:scope.scope reason:@"" progress:^(NSString *status) {
         progress.message = status;
     } completion:^(WQMBackupRecord *backup, NSError *error) {
+        [UIApplication sharedApplication].idleTimerDisabled = NO;
         [progress dismissViewControllerAnimated:YES completion:^{
             UIAlertController *result = [UIAlertController
                 alertControllerWithTitle:error

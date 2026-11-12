@@ -77,6 +77,9 @@ Everything is local. No account, no analytics, no cloud.
   scope, iOS version, timestamps and per-part hashes.
 - Backups can be exported as a `.wqbackup` package and imported again through
   the share sheet or Files.
+- Load profiles: Standard, Automatic (backs off when the device gets hot) or
+  Low-load, chosen in Settings. SHA-256, safety backups and rollback are kept
+  in every profile.
 
 ### Restore
 

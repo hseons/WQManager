@@ -2,6 +2,7 @@
 #import "WQMAppModel.h"
 #import "WQMBackupStore.h"
 #import "WQMLanguageManager.h"
+#import "WQMLoadController.h"
 #import "WQMOperationStore.h"
 #import "WQAccess.h"
 #import "WQAppsSupport.h"
@@ -20,7 +21,8 @@ static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
          progress:(nullable void (^)(NSString *status))progress
        completion:(void (^)(WQMBackupRecord *_Nullable backup, NSError *_Nullable error))completion
 {
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    WQMLoadController *load = [WQMLoadController controllerForCurrentPreferences];
+    dispatch_async(dispatch_get_global_queue(load.plan.qos, 0), ^{
         __block WQMOperationRecord *operation = nil;
         void (^report)(NSString *) = ^(NSString *status) {
             if (progress) dispatch_async(dispatch_get_main_queue(), ^{ progress(status); });
@@ -143,7 +145,7 @@ static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
                 sourceStates[part] = sourceState;
 
                 NSString *destination = [staging stringByAppendingPathComponent:part];
-                if (!wq_copy_contents(source, destination, &failure)) {
+                if (!wq_copy_contents_paced(source, destination, ^{ [load consumeEntry]; }, &failure)) {
                     failure = failure ?: [NSString stringWithFormat:
                                           WQML(@"BACKUP_ERROR_COPY_PART", @"复制 %@ 失败"), part];
                     break;
@@ -175,7 +177,9 @@ static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
                 BOOL stagedExists = NO;
                 report([NSString stringWithFormat:
                         WQML(@"BACKUP_PROGRESS_VERIFY_PART", @"正在校验 %@…"), part]);
-                NSString *contentHash = WQAppsSupportTreeContentSignature(destination, &stagedExists, &failure);
+                NSString *contentHash = WQAppsSupportTreeContentSignaturePaced(
+                    destination, &stagedExists,
+                    ^(unsigned long long bytes) { [load consumeBytes:bytes]; }, &failure);
                 if (!contentHash || !stagedExists) {
                     failure = failure ?: [NSString stringWithFormat:
                                           WQML(@"BACKUP_ERROR_HASH_PART", @"无法校验 %@"), part];

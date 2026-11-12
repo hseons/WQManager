@@ -114,7 +114,8 @@ On-disk layout:
 
 Writing is staged: copy to a temporary directory, hash, then atomically move into
 the store. A backup is only visible once `Complete` is true and every part hash
-matches.
+matches. Identity, shape and byte total come from one tree walk, so a backup
+uses four metadata passes per part instead of six.
 
 `.wqbackup` export is a copy of the backup directory with the manifest intact;
 import copies the package into a temporary location, re-validates the manifest
@@ -136,6 +137,25 @@ Restore only targets the same bundle identifier. The high-level sequence:
 
 Interrupted or failed operations are recorded in the operation store with
 enough context for the recovery UI.
+
+In the low-load profile steps 4 and 5 compare metadata captured after the first
+verification instead of re-reading every byte, and apply/rollback keep their
+post-copy hash check.
+
+## Load profiles
+
+Backup and restore run through `WQMLoadController` (`WQMLoadController.h/.m`),
+which chooses the dispatch QoS, the batch size and the pause between batches:
+
+| Profile | Behavior |
+|---|---|
+| Standard | Full speed; every verification pass runs. |
+| Automatic (default) | Full speed while cool; samples `NSProcessInfo.thermalState` every 5 s, backs off at `.serious`, pauses in 2 s slices at `.critical`, and relaxes after 30 s. Drops the two metadata-replaceable verification reads only while backed off. |
+| Low-load | Utility queue, larger batches, longer pauses; drops the two metadata-replaceable verification reads. |
+
+Every profile keeps the same SHA-256 content digests, safety backup, recovery
+journal, rollback and post-copy target verification. The narrower guarantee of
+low-load is documented in [BACKUP_RESTORE_PLAN.md](BACKUP_RESTORE_PLAN.md) §5.4.
 
 ## Cache cleaner
 

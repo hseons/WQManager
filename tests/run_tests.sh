@@ -71,3 +71,15 @@ clang \
   -o "$OUTPUT_DIR/WQMBackupArchiveTests"
 
 "$OUTPUT_DIR/WQMBackupArchiveTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  "$SOURCE_DIR/WQMLoadController.m" \
+  "$SOURCE_DIR/WQMPreferences.m" \
+  "$ROOT/tests/WQMLoadControllerTests.m" \
+  -o "$OUTPUT_DIR/WQMLoadControllerTests"
+
+"$OUTPUT_DIR/WQMLoadControllerTests"

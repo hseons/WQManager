@@ -6,6 +6,23 @@ semantic versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Data → "Backup & restore load": Standard, Automatic (default) and
+  Low-load. Automatic backs off when the device reports serious thermal
+  pressure and pauses while it is critical; Low-load always runs at a slower
+  fixed pace.
+- Backup and restore confirmations show the profile that will be used.
+
+### Changed
+
+- Copying and hashing now run in bounded batches with short pauses instead of
+  holding peak CPU and flash throughput for the whole operation. SHA-256,
+  safety backups, recovery journals and rollback are unchanged.
+- Low-load restore replaces two full verification reads with metadata checks
+  (6 → 3 full reads). The standard profile keeps every full read.
+- Backup and restore keep the screen awake while they run.
+
 ## [0.3.0] — 2026-11-12
 
 ### Added

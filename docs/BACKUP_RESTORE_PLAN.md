@@ -1,6 +1,6 @@
 # Backup & Restore Load Plan
 
-Status: Phase 1 shipped in 0.3.0 · Target: 0.3.x (Phase 2)
+Status: Phase 1 shipped in 0.3.0 · Phase 2 implemented on main (unreleased)
 Related: [issue #1](https://github.com/hseons/WQManager/issues/1)
 
 ## 1. Problem
@@ -175,6 +175,13 @@ inode, mtime, ctime, size and mode identical would no longer be detected. Apps
 cannot do that while suspended/closed in practice, but it is a real narrowing
 compared with the standard profile. That is why it is opt-in.
 
+Implementation notes: the metadata is captured right after the first
+verification. Pass 4 compares the live target against the captured metadata;
+pass 5 compares `WQMBackupRecord.manifestFingerprint` plus the source metadata.
+The automatic profile drops the two reads only while its thermal tier is above
+standard, so a cool device behaves exactly like the standard profile. Apply and
+rollback still re-hash the target after copying.
+
 ## 6. Measurement plan (P0, before Phase 2)
 
 - `Documents/backup-diag-latest.log`, one line per stage: `stage`, `part`,
@@ -210,7 +217,7 @@ compared with the standard profile. That is why it is opt-in.
 |---|---|
 | Merged digest drifts from the old one | Byte-equality test against the legacy functions |
 | Shape compared before identity | Explicit ordering + comment; test that a mid-copy change fails |
-| "Reuse" silently becomes "no check" | `WQMVerifiedBackup` fingerprint asserted at apply/rollback; test that a changed target aborts |
+| "Reuse" silently becomes "no check" | `WQMBackupRecord.manifestFingerprint` and captured metadata asserted before apply/rollback; test that a changed target aborts |
 | Pacing starves the progress UI | Pauses happen on the worker queue; progress hops to main as today |
 | `mtime` granularity hides a change | Identity digest includes ctime and directory metadata; unchanged from today |
 

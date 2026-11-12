@@ -165,6 +165,10 @@ BOOL wq_purge_contents_cancellable(NSString *dir, unsigned long long *freed,
 // Either side may be another app's container. Returns NO if anything failed.
 BOOL wq_copy_contents(NSString *srcDir, NSString *dstDir, NSString *_Nullable *_Nullable errorText);
 
+BOOL wq_copy_contents_paced(NSString *srcDir, NSString *dstDir,
+                            void (^ _Nullable consumeEntry)(void),
+                            NSString *_Nullable *_Nullable errorText);
+
 // MCM container identifier (bundle or group id) of a container folder.
 NSString *_Nullable wq_container_label(NSString *dir);
 // Extra source for wq_container_label, tried after the identifier attribute and

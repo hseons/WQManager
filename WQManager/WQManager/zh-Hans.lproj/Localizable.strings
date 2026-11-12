@@ -388,3 +388,12 @@
 "CREDITS_ROLE_WQFILES" = "容器访问、容器枚举、Launch Services 显示名称查询与安全检查";
 "SETTINGS_CLEAN_CONFIRM" = "清理二次确认";
 "SETTINGS_CLEAN_CONFIRM_SUB" = "清理前需要再次输入确认文字";
+
+"SETTINGS_LOAD_PROFILE" = "备份与恢复负载";
+"SETTINGS_LOAD_PROFILE_SUB" = "当前：%@";
+"LOAD_PROFILE_TITLE" = "备份与恢复负载";
+"LOAD_PROFILE_FOOTER" = "低负载模式会更慢，但能降低备份和恢复时的发热。安全备份、SHA-256 校验、恢复日志和回滚始终保留。";
+"LOAD_PROFILE_AUTOMATIC" = "自动";
+"LOAD_PROFILE_STANDARD" = "标准";
+"LOAD_PROFILE_LOWLOAD" = "低负载";
+"LOAD_PROFILE_CONFIRM" = "负载模式：%@";

@@ -388,3 +388,12 @@
 "CREDITS_ROLE_WQFILES" = "Container access, enumeration, Launch Services display-name lookup, and safety checks";
 "SETTINGS_CLEAN_CONFIRM" = "Double Confirmation";
 "SETTINGS_CLEAN_CONFIRM_SUB" = "Require typing the confirmation word before cleaning";
+
+"SETTINGS_LOAD_PROFILE" = "Backup & Restore Load";
+"SETTINGS_LOAD_PROFILE_SUB" = "Current: %@";
+"LOAD_PROFILE_TITLE" = "Backup & Restore Load";
+"LOAD_PROFILE_FOOTER" = "Low-load mode is slower but reduces heat during backup and restore. Safety backups, SHA-256 verification, recovery logs and rollback are always kept.";
+"LOAD_PROFILE_AUTOMATIC" = "Automatic";
+"LOAD_PROFILE_STANDARD" = "Standard";
+"LOAD_PROFILE_LOWLOAD" = "Low-load";
+"LOAD_PROFILE_CONFIRM" = "Load profile: %@";

@@ -2294,8 +2294,9 @@ BOOL wq_purge_contents(NSString *dir, unsigned long long *freed)
 
 // Flush a completed staging tree without following any links or opening special
 // files. This does not claim to snapshot a concurrently changing source tree.
-static BOOL wq_sync_entry(int parent, NSString *name)
+static BOOL wq_sync_entry(int parent, NSString *name, void (^consumeEntry)(void))
 {
+    if (consumeEntry) consumeEntry();
     struct stat st;
     if (fstatat(parent, name.fileSystemRepresentation, &st, AT_SYMLINK_NOFOLLOW) != 0) return NO;
     if (S_ISLNK(st.st_mode)) return YES;
@@ -2319,7 +2320,7 @@ static BOOL wq_sync_entry(int parent, NSString *name)
         if (!entry) { if (errno) ok = NO; break; }
         if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) continue;
         NSString *child = [NSFileManager.defaultManager stringWithFileSystemRepresentation:entry->d_name length:strlen(entry->d_name)];
-        if (!child || !wq_sync_entry(fd, child)) { ok = NO; break; }
+        if (!child || !wq_sync_entry(fd, child, consumeEntry)) { ok = NO; break; }
     }
     if (closedir(dir) != 0) ok = NO;
     if (ok && fsync(fd) != 0) ok = NO;
@@ -2327,7 +2328,8 @@ static BOOL wq_sync_entry(int parent, NSString *name)
     return ok;
 }
 
-BOOL wq_copy_contents(NSString *srcDir, NSString *dstDir, NSString **errorText)
+static BOOL wq_copy_contents_impl(NSString *srcDir, NSString *dstDir,
+                                 void (^consumeEntry)(void), NSString **errorText)
 {
     srcDir = WQCanonicalVarPath(srcDir);
     dstDir = WQCanonicalVarPath(dstDir);
@@ -2379,7 +2381,7 @@ BOOL wq_copy_contents(NSString *srcDir, NSString *dstDir, NSString **errorText)
                 if (!ok) copyError = retryError ?: copyError;
             }
         }
-        if (ok) ok = wq_sync_entry(stage, @"New") && fsync(stage) == 0;
+        if (ok) ok = wq_sync_entry(stage, @"New", consumeEntry) && fsync(stage) == 0;
         WQ_TREE_HOOK(@"copyStaged", dst);
         if (ok) ok = wq_directory_current(srcDir, source) && wq_directory_current(dstDir, destination) && wq_directory_current(stagePath, stage);
         BOOL installed = NO;
@@ -2411,6 +2413,17 @@ BOOL wq_copy_contents(NSString *srcDir, NSString *dstDir, NSString **errorText)
     if (errorText && !allOk) *errorText = firstFailure;
     wq_log(@"copy: %@ -> %@ (%lu items) %@", srcDir, dstDir, (unsigned long)children.count, allOk ? @"OK" : @"with errors");
     return allOk;
+}
+
+BOOL wq_copy_contents_paced(NSString *srcDir, NSString *dstDir,
+                            void (^consumeEntry)(void), NSString **errorText)
+{
+    return wq_copy_contents_impl(srcDir, dstDir, consumeEntry, errorText);
+}
+
+BOOL wq_copy_contents(NSString *srcDir, NSString *dstDir, NSString **errorText)
+{
+    return wq_copy_contents_impl(srcDir, dstDir, nil, errorText);
 }
 
 // Container-manager enumeration is a second, permission-independent way to

@@ -3,6 +3,7 @@
 #import "WQMBackupService.h"
 #import "WQMBackupStore.h"
 #import "WQMLanguageManager.h"
+#import "WQMLoadController.h"
 #import "WQMOperationStore.h"
 #import "WQAccess.h"
 #import "WQAppsSupport.h"
@@ -97,7 +98,7 @@ static BOOL WQMRestoreValidateApp(WQMAppModel *app, NSString **reason)
     return YES;
 }
 
-static BOOL WQMRestoreVerifyBackup(WQMBackupRecord *record, NSString **reason)
+static BOOL WQMRestoreVerifyBackup(WQMBackupRecord *record, WQMLoadController *load, NSString **reason)
 {
     NSString *root = [WQMBackupStore backupRoot].stringByStandardizingPath;
     NSString *path = record.path.stringByStandardizingPath;
@@ -116,7 +117,9 @@ static BOOL WQMRestoreVerifyBackup(WQMBackupRecord *record, NSString **reason)
     for (NSString *part in fresh.parts) {
         BOOL exists = NO;
         NSString *partPath = [path stringByAppendingPathComponent:part];
-        NSString *hash = WQAppsSupportTreeContentSignature(partPath, &exists, reason);
+        NSString *hash = WQAppsSupportTreeContentSignaturePaced(
+            partPath, &exists,
+            ^(unsigned long long bytes) { [load consumeBytes:bytes]; }, reason);
         if (!hash || !exists || ![hash isEqualToString:fresh.partHashes[part]]) {
             if (reason && !*reason) *reason = [NSString stringWithFormat:
                                                WQML(@"RESTORE_ERROR_BACKUP_PART_CHANGED",
@@ -156,8 +159,93 @@ static BOOL WQMRestoreSafetyBackupIntact(WQMBackupRecord *record, NSString **rea
     return YES;
 }
 
+// Captures identity and shape digests for the named parts without reading file
+// bytes. A reduced-verification restore reads content once, then proves nothing
+// changed from inode/mtime/ctime/size instead of re-reading every byte.
+static NSDictionary<NSString *, NSString *> *WQMRestoreCaptureMetadata(NSString *root,
+                                                                       NSArray<NSString *> *parts,
+                                                                       NSString **reason)
+{
+    NSMutableDictionary<NSString *, NSString *> *captured = [NSMutableDictionary new];
+    for (NSString *part in parts) {
+        BOOL exists = NO;
+        NSString *identity = nil;
+        NSString *shape = nil;
+        NSString *error = nil;
+        if (!WQAppsSupportTreeDigests([root stringByAppendingPathComponent:part], &exists,
+                                      &identity, &shape, NULL, &error)) {
+            if (reason && !*reason) *reason = error ?: WQML(@"RESTORE_ERROR_BACKUP_VALIDATION",
+                                                            @"备份校验失败。");
+            return nil;
+        }
+        captured[part] = [NSString stringWithFormat:@"%d|%@|%@", exists ? 1 : 0, identity, shape];
+    }
+    return captured;
+}
+
+static BOOL WQMRestoreTargetMatchesBackupMetadata(NSString *container,
+                                                  NSArray<NSString *> *requestedParts,
+                                                  WQMBackupRecord *backup,
+                                                  NSDictionary<NSString *, NSString *> *captured,
+                                                  NSString **reason)
+{
+    for (NSString *part in backup.parts) {
+        if (captured[part]) continue;
+        if (reason) *reason = WQML(@"RESTORE_ERROR_TARGET_VALIDATION", @"目标 App 校验失败。");
+        return NO;
+    }
+    NSDictionary<NSString *, NSString *> *current =
+        WQMRestoreCaptureMetadata(container, backup.parts, reason);
+    if (!current) return NO;
+    for (NSString *part in backup.parts) {
+        if ([current[part] isEqualToString:captured[part]]) continue;
+        if (reason) *reason = [NSString stringWithFormat:
+            WQML(@"RESTORE_ERROR_TARGET_CHANGED_AFTER_SAFETY",
+                 @"目标 %@ 在安全备份后发生变化，请关闭 App 后重试"), part];
+        return NO;
+    }
+    for (NSString *part in requestedParts) {
+        if ([backup.parts containsObject:part]) continue;
+        NSString *target = [container stringByAppendingPathComponent:part];
+        struct stat st = {0};
+        if (!wq_stat(target, &st)) continue;
+        NSArray *children = [NSFileManager.defaultManager contentsOfDirectoryAtPath:target error:nil];
+        if (!children || children.count) {
+            if (reason) *reason = [NSString stringWithFormat:
+                WQML(@"RESTORE_ERROR_TARGET_NEW_CONTENT_AFTER_SAFETY",
+                     @"目标 %@ 在安全备份后出现了新内容"), part];
+            return NO;
+        }
+    }
+    return YES;
+}
+
+static BOOL WQMRestoreBackupMetadataUnchanged(WQMBackupRecord *backup,
+                                              NSDictionary<NSString *, NSString *> *captured,
+                                              NSString **reason)
+{
+    NSString *loadError = nil;
+    WQMBackupRecord *fresh = [WQMBackupRecord recordAtPath:backup.path error:&loadError];
+    if (!fresh || ![fresh.manifestFingerprint isEqualToString:backup.manifestFingerprint]) {
+        if (reason) *reason = loadError ?: WQML(@"RESTORE_ERROR_BACKUP_CHANGED",
+                                                @"备份清单已变化或无效");
+        return NO;
+    }
+    NSDictionary<NSString *, NSString *> *current =
+        WQMRestoreCaptureMetadata(backup.path, backup.parts, reason);
+    if (!current) return NO;
+    for (NSString *part in backup.parts) {
+        if ([current[part] isEqualToString:captured[part]]) continue;
+        if (reason) *reason = [NSString stringWithFormat:
+            WQML(@"RESTORE_ERROR_BACKUP_PART_CHANGED", @"备份的 %@ 内容已变化"), part];
+        return NO;
+    }
+    return YES;
+}
+
 static BOOL WQMRestoreApply(NSString *container, NSArray<NSString *> *requestedParts,
-                            WQMBackupRecord *source, NSString **reason)
+                            WQMBackupRecord *source, WQMLoadController *load,
+                            NSString **reason)
 {
     for (NSString *part in requestedParts) {
         if (!WQMRestoreAllowedPart(part)) {
@@ -184,7 +272,8 @@ static BOOL WQMRestoreApply(NSString *container, NSArray<NSString *> *requestedP
 
         if ([source.parts containsObject:part]) {
             NSString *sourcePart = [source.path stringByAppendingPathComponent:part];
-            if (!wq_copy_contents(sourcePart, target, reason)) {
+            if (!wq_copy_contents_paced(sourcePart, target,
+                                        ^{ [load consumeEntry]; }, reason)) {
                 if (reason && !*reason) *reason = [NSString stringWithFormat:
                                                    WQML(@"RESTORE_ERROR_COPY_TARGET",
                                                         @"复制 %@ 到目标失败"), part];
@@ -197,7 +286,9 @@ static BOOL WQMRestoreApply(NSString *container, NSArray<NSString *> *requestedP
         NSString *target = [container stringByAppendingPathComponent:part];
         if ([source.parts containsObject:part]) {
             BOOL exists = NO;
-            NSString *hash = WQAppsSupportTreeContentSignature(target, &exists, reason);
+            NSString *hash = WQAppsSupportTreeContentSignaturePaced(
+                target, &exists,
+                ^(unsigned long long bytes) { [load consumeBytes:bytes]; }, reason);
             if (!hash || !exists || ![hash isEqualToString:source.partHashes[part]]) {
                 if (reason && !*reason) *reason = [NSString stringWithFormat:
                                                    WQML(@"RESTORE_ERROR_VERIFY_TARGET",
@@ -284,7 +375,8 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
         dispatch_async(dispatch_get_main_queue(), ^{ completion(success, message, error); });
     };
 
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    WQMLoadController *load = [WQMLoadController controllerForCurrentPreferences];
+    dispatch_async(dispatch_get_global_queue(load.plan.qos, 0), ^{
         for (NSDictionary *journal in WQMRestoreJournals()) {
             if ([journal[@"State"] isEqualToString:@"Active"]) {
                 finish(NO, WQML(@"RESTORE_ERROR_ACTIVE_JOURNAL",
@@ -308,9 +400,20 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
             return;
         }
         report(WQML(@"RESTORE_PROGRESS_VERIFY_BACKUP", @"正在校验备份内容…"));
-        if (!WQMRestoreVerifyBackup(backup, &reason)) {
+        if (!WQMRestoreVerifyBackup(backup, load, &reason)) {
             finish(NO, reason ?: WQML(@"RESTORE_ERROR_BACKUP_VALIDATION", @"备份校验失败。"), nil);
             return;
+        }
+        BOOL reducePasses = load.reduceVerificationPasses;
+        NSDictionary<NSString *, NSString *> *sourceMetadata = nil;
+        NSDictionary<NSString *, NSString *> *targetMetadata = nil;
+        if (reducePasses) {
+            sourceMetadata = WQMRestoreCaptureMetadata(backup.path, backup.parts, &reason);
+            targetMetadata = WQMRestoreCaptureMetadata(app.containerPath, requestedParts, &reason);
+            if (!sourceMetadata || !targetMetadata) {
+                finish(NO, reason ?: WQML(@"RESTORE_ERROR_BACKUP_VALIDATION", @"备份校验失败。"), nil);
+                return;
+            }
         }
         operation = [WQMOperationStore beginOperation:WQMOperationKindRestore
                                               appName:app.displayName
@@ -352,14 +455,22 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
                                 validation ?: @""], nil);
                     return;
                 }
-                if (!WQMRestoreTargetMatchesBackup(app.containerPath, requestedParts, safety, &validation)) {
+                BOOL targetMatches = reducePasses
+                    ? WQMRestoreTargetMatchesBackupMetadata(app.containerPath, requestedParts,
+                                                            safety, targetMetadata, &validation)
+                    : WQMRestoreTargetMatchesBackup(app.containerPath, requestedParts, safety,
+                                                    &validation);
+                if (!targetMatches) {
                     finish(NO, [NSString stringWithFormat:
                                 WQML(@"RESTORE_ERROR_TARGET_CHANGED_AFTER_SAFETY_SHORT",
                                      @"目标数据在安全备份后发生变化，未修改数据。%@"),
                                 validation ?: @""], nil);
                     return;
                 }
-                if (!WQMRestoreVerifyBackup(backup, &validation)) {
+                BOOL sourceOK = reducePasses
+                    ? WQMRestoreBackupMetadataUnchanged(backup, sourceMetadata, &validation)
+                    : WQMRestoreVerifyBackup(backup, load, &validation);
+                if (!sourceOK) {
                     finish(NO, [NSString stringWithFormat:
                                 WQML(@"RESTORE_ERROR_SOURCE_CHANGED",
                                      @"源备份在恢复前发生变化，未修改数据。%@"),
@@ -395,7 +506,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
 
                 report(WQML(@"RESTORE_PROGRESS_REPLACE", @"正在替换 App 数据…"));
                 NSString *applyError = nil;
-                BOOL applied = WQMRestoreApply(app.containerPath, requestedParts, backup, &applyError);
+                BOOL applied = WQMRestoreApply(app.containerPath, requestedParts, backup, load, &applyError);
                 if (applied) {
                     NSMutableDictionary *committed = [journal mutableCopy];
                     committed[@"State"] = @"Committed";
@@ -414,7 +525,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
 
                 report(WQML(@"RESTORE_PROGRESS_ROLLBACK", @"替换失败，正在回滚…"));
                 NSString *rollbackError = nil;
-                BOOL rolledBack = WQMRestoreApply(app.containerPath, requestedParts, safety, &rollbackError);
+                BOOL rolledBack = WQMRestoreApply(app.containerPath, requestedParts, safety, load, &rollbackError);
                 if (rolledBack) {
                     [NSFileManager.defaultManager removeItemAtPath:journalPath error:nil];
                     operation.status = WQMOperationStatusRolledBack;
@@ -472,7 +583,8 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
         }
         dispatch_async(dispatch_get_main_queue(), ^{ completion(success, message, error); });
     };
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    WQMLoadController *load = [WQMLoadController controllerForCurrentPreferences];
+    dispatch_async(dispatch_get_global_queue(load.plan.qos, 0), ^{
         NSDictionary *active = nil;
         for (NSDictionary *journal in WQMRestoreJournals()) {
             if ([journal[@"State"] isEqualToString:@"Active"]) {
@@ -502,7 +614,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
         WQMBackupRecord *safety = [WQMBackupRecord recordAtPath:safetyPath error:nil];
         NSString *reason = nil;
         if (!safety || ![safety.bundleIdentifier isEqualToString:bundleID] ||
-            !WQMRestoreVerifyBackup(safety, &reason)) {
+            !WQMRestoreVerifyBackup(safety, load, &reason)) {
             finish(NO, reason ?: WQML(@"RECOVERY_ERROR_SAFETY_UNAVAILABLE",
                                       @"自动安全备份已不可用，需要人工检查。"), nil);
             return;
@@ -521,7 +633,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
             return;
         }
         report(WQML(@"RECOVERY_PROGRESS", @"正在回滚上次中断的恢复…"));
-        if (!WQMRestoreApply(container, parts, safety, &reason)) {
+        if (!WQMRestoreApply(container, parts, safety, load, &reason)) {
             finish(NO, reason ?: WQML(@"RECOVERY_ERROR_FAILED", @"中断恢复回滚失败。"), nil);
             return;
         }

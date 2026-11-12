@@ -11,6 +11,16 @@
 #import "WQMTheme.h"
 #import "WQAccess.h"
 
+static NSString *WQMLoadProfileName(WQMLoadProfile profile)
+{
+    switch (profile) {
+        case WQMLoadProfileStandard: return WQML(@"LOAD_PROFILE_STANDARD", @"标准");
+        case WQMLoadProfileLowLoad: return WQML(@"LOAD_PROFILE_LOWLOAD", @"低负载");
+        case WQMLoadProfileAutomatic:
+        default: return WQML(@"LOAD_PROFILE_AUTOMATIC", @"自动");
+    }
+}
+
 @interface WQMTextDocumentViewController : UIViewController
 
 @property (nonatomic, copy) NSString *documentTitle;
@@ -212,7 +222,7 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
     if (section == 0) return 4;
-    if (section == 1) return 4;
+    if (section == 1) return 5;
     if (section == 2) return 4;
     return 2;
 }
@@ -294,6 +304,13 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
                    action:@selector(cleanDoubleConfirmToggled:)
          forControlEvents:UIControlEventValueChanged];
         cell.accessoryView = toggle;
+    } else if (indexPath.section == 1 && indexPath.row == 4) {
+        content.text = WQML(@"SETTINGS_LOAD_PROFILE", @"备份与恢复负载");
+        content.secondaryText = [NSString stringWithFormat:
+                                 WQML(@"SETTINGS_LOAD_PROFILE_SUB", @"当前：%@"),
+                                 WQMLoadProfileName(WQMLoadProfileCurrent())];
+        content.image = [UIImage systemImageNamed:@"thermometer.medium"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 3 && indexPath.row == 0) {
         content.text = WQML(@"TELEGRAM_CHANNEL", @"Telegram 频道");
         content.secondaryText = WQML(@"TELEGRAM_CHANNEL_SUB", @"@TheBallnow · t.me/TheBallnow");
@@ -344,6 +361,10 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
             ? (UISwitch *)cell.accessoryView : nil;
         [toggle setOn:!toggle.isOn animated:YES];
         [self cleanDoubleConfirmToggled:toggle];
+        return;
+    }
+    if (indexPath.section == 1 && indexPath.row == 4) {
+        [self showLoadProfileSelectorFromCell:[tableView cellForRowAtIndexPath:indexPath]];
         return;
     }
     if (indexPath.section == 1 && indexPath.row == 1) {
@@ -498,6 +519,38 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
         }]];
     }
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)showLoadProfileSelectorFromCell:(UITableViewCell *)cell
+{
+    WQMLoadProfile current = WQMLoadProfileCurrent();
+    UIAlertController *sheet = [UIAlertController
+        alertControllerWithTitle:WQML(@"LOAD_PROFILE_TITLE", @"备份与恢复负载")
+                         message:WQML(@"LOAD_PROFILE_FOOTER",
+                                      @"低负载模式会更慢，但能降低备份和恢复时的发热。"
+                                       "安全备份、SHA-256 校验、恢复日志和回滚始终保留。")
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+    NSArray<NSNumber *> *profiles = @[@(WQMLoadProfileAutomatic),
+                                      @(WQMLoadProfileLowLoad),
+                                      @(WQMLoadProfileStandard)];
+    for (NSNumber *number in profiles) {
+        WQMLoadProfile profile = number.integerValue;
+        NSString *title = [NSString stringWithFormat:@"%@%@",
+                           profile == current ? @"✓ " : @"",
+                           WQMLoadProfileName(profile)];
+        [sheet addAction:[UIAlertAction actionWithTitle:title
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__unused UIAlertAction *action) {
+            WQMLoadProfileSetCurrent(profile);
+            [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:4 inSection:1]]
+                                  withRowAnimation:UITableViewRowAnimationNone];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"CANCEL", @"取消")
+                                              style:UIAlertActionStyleCancel handler:nil]];
+    sheet.popoverPresentationController.sourceView = cell ?: self.tableView;
+    sheet.popoverPresentationController.sourceRect = cell ? cell.bounds : CGRectZero;
+    [self presentViewController:sheet animated:YES completion:nil];
 }
 
 - (void)cleanDoubleConfirmToggled:(UISwitch *)sender

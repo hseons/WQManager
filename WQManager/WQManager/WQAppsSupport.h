@@ -331,7 +331,11 @@ static inline NSString *WQAppsSupportFileFingerprint(NSString *path)
 // Content-level digest for backup verification: metadata plus every regular
 // file's bytes. Reading is streamed; a file that changes while it is hashed
 // fails with an error rather than producing a torn digest.
-static inline NSString *WQAppsSupportTreeContentSignature(NSString *path, BOOL *exists, NSString **errorOut)
+// Content digest with an optional pacing hook: `consumeBytes` is called after
+// each chunk is read, before the next read starts.
+static inline NSString *WQAppsSupportTreeContentSignaturePaced(NSString *path, BOOL *exists,
+                                                               void (^ _Nullable consumeBytes)(unsigned long long bytes),
+                                                               NSString **errorOut)
 {
     struct stat rootStat;
     if (lstat(path.fileSystemRepresentation, &rootStat) != 0) {
@@ -398,6 +402,7 @@ static inline NSString *WQAppsSupportTreeContentSignature(NSString *path, BOOL *
                 }
                 if (n == 0) break;
                 CC_SHA256_Update(&ctx, buffer, (CC_LONG)n);
+                if (consumeBytes) consumeBytes((unsigned long long)n);
             }
             struct stat finalStat;
             if (ok && (fstat(fd, &finalStat) != 0 ||
@@ -429,6 +434,12 @@ static inline NSString *WQAppsSupportTreeContentSignature(NSString *path, BOOL *
     for (NSUInteger i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) [hex appendFormat:@"%02x", digest[i]];
     return hex;
 }
+
+static inline NSString *WQAppsSupportTreeContentSignature(NSString *path, BOOL *exists, NSString **errorOut)
+{
+    return WQAppsSupportTreeContentSignaturePaced(path, exists, nil, errorOut);
+}
+
 
 static inline NSUInteger WQAppsSupportBackupSequence(NSString *name)
 {
