@@ -6,6 +6,7 @@
 #import "WQMLanguageManager.h"
 #import "WQMCreditsViewController.h"
 #import "WQMMarkdownRenderer.h"
+#import "WQMStorageViewController.h"
 #import "WQMOperationStore.h"
 #import "WQMPreferences.h"
 #import "WQMTheme.h"
@@ -222,7 +223,7 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
     if (section == 0) return 4;
-    if (section == 1) return 5;
+    if (section == 1) return 6;
     if (section == 2) return 4;
     return 2;
 }
@@ -311,6 +312,11 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
                                  WQMLoadProfileName(WQMLoadProfileCurrent())];
         content.image = [UIImage systemImageNamed:@"thermometer.medium"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    } else if (indexPath.section == 1 && indexPath.row == 5) {
+        content.text = WQML(@"SETTINGS_STORAGE", @"存储占用");
+        content.secondaryText = WQML(@"SETTINGS_STORAGE_SUB", @"查看备份、临时文件与缓存");
+        content.image = [UIImage systemImageNamed:@"internaldrive"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 3 && indexPath.row == 0) {
         content.text = WQML(@"TELEGRAM_CHANNEL", @"Telegram 频道");
         content.secondaryText = WQML(@"TELEGRAM_CHANNEL_SUB", @"@TheBallnow · t.me/TheBallnow");
@@ -365,6 +371,10 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
     }
     if (indexPath.section == 1 && indexPath.row == 4) {
         [self showLoadProfileSelectorFromCell:[tableView cellForRowAtIndexPath:indexPath]];
+        return;
+    }
+    if (indexPath.section == 1 && indexPath.row == 5) {
+        [self.navigationController pushViewController:[WQMStorageViewController new] animated:YES];
         return;
     }
     if (indexPath.section == 1 && indexPath.row == 1) {

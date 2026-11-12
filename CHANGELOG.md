@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.3.1] — 2026-11-12
+
+- Storage panel: inspect and clean invalid or interrupted backups and temp files.
+- Keep only the newest automatic safety backup per app.
+
 ## [0.3.0] — 2026-11-12
 
 ### Added

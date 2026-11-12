@@ -5,6 +5,7 @@
 #import "WQMLanguageManager.h"
 #import "WQMLoadController.h"
 #import "WQMOperationStore.h"
+#import "WQMStorageService.h"
 #import "WQAccess.h"
 #import "WQAppsSupport.h"
 
@@ -617,6 +618,13 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
                     }
                     wq_log(@"restore %@: OK from %@; safety %@", app.bundleIdentifier,
                            backup.path, safety.path);
+                    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+                        NSSet<NSString *> *protectedPaths = [NSSet setWithArray:
+                            [WQMRestoreService pendingRecoveryBackupPaths]];
+                        [WQMStorageService pruneSafetyBackupsKeeping:1
+                                                            excluding:protectedPaths
+                                                          deletedBytes:NULL];
+                    });
                     finish(YES, [NSString stringWithFormat:
                                  WQML(@"RESTORE_SUCCESS",
                                       @"恢复完成。\n\n恢复前数据已保存在：\n%@\n\n请打开目标 App 验证登录状态和功能。"),

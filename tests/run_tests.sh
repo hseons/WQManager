@@ -94,3 +94,16 @@ clang \
   -o "$OUTPUT_DIR/WQMHousekeepingTests"
 
 "$OUTPUT_DIR/WQMHousekeepingTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  "$SOURCE_DIR/WQMStorageService.m" \
+  "$SOURCE_DIR/WQMBackupStore.m" \
+  "$SOURCE_DIR/WQMLanguageManager.m" \
+  "$ROOT/tests/WQMStorageServiceTests.m" \
+  -o "$OUTPUT_DIR/WQMStorageServiceTests"
+
+"$OUTPUT_DIR/WQMStorageServiceTests"

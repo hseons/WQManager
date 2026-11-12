@@ -13,6 +13,7 @@
 #import "WQMSharedInbox.h"
 #import "WQMTheme.h"
 #import "WQMHousekeeping.h"
+#import "WQMStorageViewController.h"
 #if DEBUG
 #import "WQMLongOperationBanner.h"
 #endif
@@ -41,6 +42,19 @@
     [window makeKeyAndVisible];
     [WQMHousekeeping runAtLaunch];
 #if DEBUG
+    if (getenv("WQM_UI_STORAGE")) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            UIViewController *root = self.window.rootViewController;
+            if ([root isKindOfClass:UITabBarController.class]) {
+                root = ((UITabBarController *)root).selectedViewController;
+            }
+            if ([root isKindOfClass:UINavigationController.class]) {
+                [(UINavigationController *)root pushViewController:[WQMStorageViewController new]
+                                                          animated:NO];
+            }
+        });
+    }
     if (getenv("WQM_BANNER_DEMO")) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
