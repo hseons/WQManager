@@ -16,6 +16,8 @@ semantic versioning once it reaches 1.0.
 - Long backup, restore, import, export, recovery, delete and clean operations
   now report through a floating capsule below the status bar instead of a
   blocking alert. The rest of the app stays usable while the operation runs.
+- The app action sheet (quick/full backup, restore, copy Bundle ID) now
+  blurs the screen behind it so the sheet reads as a separate layer.
 - Tap the capsule to expand it into a drawer with the live status, a stop
   action when available, and a collapse button. The drawer springs open
   from the capsule and collapses on tap; Reduce Motion skips the spring.

@@ -292,6 +292,10 @@ static NSString *WQMLoadProfileConfirmationLine(void)
 
 @end
 
+@interface WQMAppsViewController () <UIAdaptivePresentationControllerDelegate>
+@property (nonatomic, strong, nullable) UIVisualEffectView *sheetBlurView;
+@end
+
 @implementation WQMAppsViewController {
     NSArray<WQMAppModel *> *_apps;
     NSArray<WQMAppModel *> *_visibleApps;
@@ -710,8 +714,10 @@ static NSString *WQMLoadProfileConfirmationLine(void)
 - (void)presentActionsForApp:(WQMAppModel *)app
 {
     [self dismissSearchKeyboard];
+    [self installSheetBlur];
     WQMAppActionsViewController *actions = [[WQMAppActionsViewController alloc] initWithApp:app];
     actions.actionHandler = ^(WQMAppAction action) {
+        [self removeSheetBlur];
         if (action == WQMAppActionCopyBundleID) {
             if (!app.bundleIdentifier.length) return;
             UIPasteboard.generalPasteboard.string = app.bundleIdentifier;
@@ -728,7 +734,49 @@ static NSString *WQMLoadProfileConfirmationLine(void)
         WQMBackupScopeDescriptor *descriptor = [WQMBackupScopeDescriptor descriptorForScope:scope];
         if (descriptor) [self confirmBackupForApp:app scope:descriptor];
     };
-    [self presentViewController:actions animated:YES completion:nil];
+    [self presentViewController:actions animated:YES completion:^{
+        actions.presentationController.delegate = self;
+    }];
+}
+
+- (void)installSheetBlur
+{
+    if (self.sheetBlurView) return;
+    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:
+        [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial]];
+    blur.translatesAutoresizingMaskIntoConstraints = NO;
+    blur.userInteractionEnabled = NO;
+    blur.alpha = 0;
+    UIView *host = self.navigationController.view ?: self.view;
+    [host addSubview:blur];
+    [NSLayoutConstraint activateConstraints:@[
+        [blur.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+        [blur.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
+        [blur.topAnchor constraintEqualToAnchor:host.topAnchor],
+        [blur.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
+    ]];
+    self.sheetBlurView = blur;
+    [UIView animateWithDuration:0.28 animations:^{ blur.alpha = 0.55; }];
+}
+
+- (void)removeSheetBlur
+{
+    UIVisualEffectView *blur = self.sheetBlurView;
+    if (!blur) return;
+    self.sheetBlurView = nil;
+    [UIView animateWithDuration:0.22 animations:^{ blur.alpha = 0; } completion:^(__unused BOOL finished) {
+        [blur removeFromSuperview];
+    }];
+}
+
+- (void)presentationControllerWillDismiss:(__unused UIPresentationController *)presentationController
+{
+    [self removeSheetBlur];
+}
+
+- (void)presentationControllerDidDismiss:(__unused UIPresentationController *)presentationController
+{
+    [self removeSheetBlur];
 }
 
 - (void)loadBackupsAndShowRestorePickerForApp:(WQMAppModel *)app
