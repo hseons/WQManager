@@ -404,3 +404,21 @@
 
 "COLLAPSE" = "Collapse";
 "STOPPING" = "Stopping…";
+
+"RESTORE_ERROR_JOURNAL_WRITE" = "Could not write the recovery journal (errno %d)";
+"RESTORE_ERROR_JOURNAL_SYNC" = "Could not flush the recovery journal to disk";
+"RESTORE_ERROR_JOURNAL_INVALID" = "The recovery journal could not be read or has an unknown state: %@. Check Documents/RestoreRecovery and try again.";
+"RECOVERY_SUMMARY_INVALID" = "Unreadable recovery journal: %@";
+"RECOVERY_ERROR_JOURNAL_INVALID" = "The recovery journal could not be read or has an unknown state: %@, manual inspection is required.";
+"RECOVERY_ERROR_ID_MISMATCH" = "The target app container no longer matches; automatic rollback is not possible.";
+
+"BACKUP_ERROR_SYNC" = "Could not flush the backup to disk";
+
+"BACKUP_ERROR_NO_SPACE" = "Not enough free space: at least %@ required, %@ available.";
+"RESTORE_ERROR_NO_SPACE" = "Not enough free space: at least %@ required, %@ available. The target app was not modified.";
+"ARCHIVE_ERROR_NO_SPACE" = "Not enough free space: at least %@ required, %@ available.";
+
+"RESTORE_ERROR_APP_RUNNING" = "The target app is running (pid %d). Close it from the app switcher and try again.";
+"RECOVERY_ERROR_APP_RUNNING" = "The target app is running (pid %d). Close it from the app switcher and try again.";
+"DELETE_BACKUP_REFERENCED_TITLE" = "Cannot delete";
+"DELETE_BACKUP_REFERENCED_MESSAGE" = "This backup is referenced by an unfinished restore. Finish the recovery first.";

@@ -171,6 +171,10 @@ BOOL wq_copy_contents_paced(NSString *srcDir, NSString *dstDir,
 
 // MCM container identifier (bundle or group id) of a container folder.
 NSString *_Nullable wq_container_label(NSString *dir);
+
+// Best-effort check through FrontBoardServices. Returns 0 when the private API
+// is unavailable, so callers must treat 0 as "unknown", not "not running".
+int wq_process_id_for_bundle(NSString *bundleID);
 // Extra source for wq_container_label, tried after the identifier attribute and
 // the container-manager table: path (/private/var/...) -> identifier or nil.
 // iOS 26: where a full scan takes far too long, the App Data and Extensions

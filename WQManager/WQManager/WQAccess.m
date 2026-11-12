@@ -167,6 +167,38 @@ static int64_t wq_query_token(NSString *group, BOOL altFlags)
     }
 }
 
+int wq_process_id_for_bundle(NSString *bundleID)
+{
+    if (!bundleID.length) return 0;
+    static dispatch_once_t onceToken;
+    static SEL pidSelector;
+    static int (*pidFunction)(id, SEL, NSString *);
+    static id (*sharedServiceFunction)(id, SEL);
+    dispatch_once(&onceToken, ^{
+        void *handle = dlopen("/System/Library/PrivateFrameworks/FrontBoardServices.framework/FrontBoardServices",
+                              RTLD_LAZY | RTLD_LOCAL);
+        (void)handle;
+        Class serviceClass = NSClassFromString(@"FBSSystemService");
+        SEL sharedSelector = NSSelectorFromString(@"sharedService");
+        SEL pid = NSSelectorFromString(@"pidForApplication:");
+        if (serviceClass && [serviceClass respondsToSelector:sharedSelector]) {
+            id service = [serviceClass performSelector:sharedSelector];
+            if (service && [service respondsToSelector:pid]) {
+                sharedServiceFunction = (id (*)(id, SEL))[serviceClass methodForSelector:sharedSelector];
+                pidSelector = pid;
+                pidFunction = (int (*)(id, SEL, NSString *))[service methodForSelector:pid];
+            }
+        }
+    });
+    if (!pidFunction || !sharedServiceFunction) return 0;
+    Class serviceClass = NSClassFromString(@"FBSSystemService");
+    if (!serviceClass) return 0;
+    id service = sharedServiceFunction(serviceClass, NSSelectorFromString(@"sharedService"));
+    if (!service) return 0;
+    int pid = pidFunction(service, pidSelector, bundleID);
+    return pid > 0 ? pid : 0;
+}
+
 BOOL wq_system_areas_reachable(void)
 {
     // worse_query reaches System Data, the system groups and the App Groups

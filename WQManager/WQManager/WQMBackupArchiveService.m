@@ -90,6 +90,15 @@ static BOOL WQMArchiveVerifyPayload(WQMBackupRecord *backup, NSString **reason)
         stamp.dateFormat = @"yyyyMMdd-HHmmss";
         NSString *name = [NSString stringWithFormat:@"%@_%@.wqbackup",
                           WQMArchiveSafeName(verified.displayName), [stamp stringFromDate:verified.createdAt]];
+        unsigned long long freeBytes = WQMAppsSupportVolumeAvailableBytes(NSTemporaryDirectory());
+        if (freeBytes < WQM_MIN_FREE_SPACE) {
+            finish(nil, WQMArchiveError(5, [NSString stringWithFormat:
+                                            WQML(@"ARCHIVE_ERROR_NO_SPACE",
+                                                 @"可用空间不足：至少需要 %@，当前 %@。"),
+                                            WQMFormatBytes(WQM_MIN_FREE_SPACE),
+                                            WQMFormatBytes(freeBytes)]));
+            return;
+        }
         NSURL *destination = [NSURL fileURLWithPath:
             [NSTemporaryDirectory() stringByAppendingPathComponent:
              [NSString stringWithFormat:@"WQMExport-%@/%@", NSUUID.UUID.UUIDString, name]]
@@ -137,6 +146,18 @@ static BOOL WQMArchiveVerifyPayload(WQMBackupRecord *backup, NSString **reason)
             dispatch_async(dispatch_get_main_queue(), ^{ completion(backup, error); });
         };
         BOOL scoped = [sourceURL startAccessingSecurityScopedResource];
+        unsigned long long packageBytes = WQMAppsSupportTreeSize(sourceURL.path);
+        unsigned long long freeBytes = WQMAppsSupportVolumeAvailableBytes(NSTemporaryDirectory());
+        unsigned long long requiredBytes = packageBytes + WQM_MIN_FREE_SPACE;
+        if (freeBytes < requiredBytes) {
+            if (scoped) [sourceURL stopAccessingSecurityScopedResource];
+            finish(nil, WQMArchiveError(6, [NSString stringWithFormat:
+                                            WQML(@"ARCHIVE_ERROR_NO_SPACE",
+                                                 @"可用空间不足：至少需要 %@，当前 %@。"),
+                                            WQMFormatBytes(requiredBytes),
+                                            WQMFormatBytes(freeBytes)]));
+            return;
+        }
         NSError *error = nil;
         NSURL *temporary = [NSURL fileURLWithPath:
             [NSTemporaryDirectory() stringByAppendingPathComponent:

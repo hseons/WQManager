@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
            completion:(void (^)(BOOL success, NSString *message, NSError *_Nullable error))completion;
 
 + (nullable NSString *)activeRecoverySummary;
++ (NSArray<NSString *> *)pendingRecoveryBackupPaths;
 + (void)recoverActiveRecoveryWithProgress:(nullable void (^)(NSString *status))progress
                                 completion:(void (^)(BOOL success, NSString *message,
                                                      NSError *_Nullable error))completion;

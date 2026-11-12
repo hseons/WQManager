@@ -9,7 +9,9 @@
 #import "WQAppsSupport.h"
 
 #import <errno.h>
+#import <fcntl.h>
 #import <sys/stat.h>
+#import <unistd.h>
 
 static NSString *const kWQMRestoreFormat = @"WQMRestoreJournal";
 
@@ -29,14 +31,34 @@ static NSArray<NSDictionary *> *WQMRestoreJournals(void)
         if (![name.pathExtension isEqualToString:@"plist"]) continue;
         NSString *path = [root stringByAppendingPathComponent:name];
         NSDictionary *journal = [NSDictionary dictionaryWithContentsOfFile:path];
-        if ([journal isKindOfClass:NSDictionary.class] &&
-            [journal[@"Format"] isEqualToString:kWQMRestoreFormat]) {
+        if (![journal isKindOfClass:NSDictionary.class] ||
+            ![journal[@"Format"] isEqualToString:kWQMRestoreFormat]) {
+            [journals addObject:@{@"JournalPath": path, @"State": @"Invalid"}];
+            continue;
+        }
+        {
             NSMutableDictionary *copy = [journal mutableCopy];
             copy[@"JournalPath"] = path;
             [journals addObject:copy];
         }
     }
     return journals;
+}
+
+static BOOL WQMRestoreSyncDirectory(NSString *path)
+{
+    int fd = open(path.fileSystemRepresentation, O_RDONLY);
+    if (fd < 0) return NO;
+    BOOL synced = (fsync(fd) == 0);
+    close(fd);
+    return synced;
+}
+
+static BOOL WQMRestoreRemoveJournal(NSString *path)
+{
+    if (!path.length) return YES;
+    if (unlink(path.fileSystemRepresentation) != 0 && errno != ENOENT) return NO;
+    return WQMRestoreSyncDirectory(path.stringByDeletingLastPathComponent);
 }
 
 static BOOL WQMRestoreWriteJournal(NSDictionary *journal, NSString *path, NSError **error)
@@ -48,11 +70,60 @@ static BOOL WQMRestoreWriteJournal(NSDictionary *journal, NSString *path, NSErro
                                                                 @"恢复日志格式无效")}];
         return NO;
     }
+    NSError *serializationError = nil;
     NSData *data = [NSPropertyListSerialization dataWithPropertyList:journal
                                                                format:NSPropertyListBinaryFormat_v1_0
                                                               options:0
-                                                                error:error];
-    return data && [data writeToFile:path options:NSDataWritingAtomic error:error];
+                                                                error:&serializationError];
+    if (!data) {
+        if (error) *error = serializationError;
+        return NO;
+    }
+    NSString *directory = path.stringByDeletingLastPathComponent;
+    NSString *temporary = [directory stringByAppendingPathComponent:
+                           [NSString stringWithFormat:@".%@.journal", NSUUID.UUID.UUIDString]];
+    int fd = open(temporary.fileSystemRepresentation, O_WRONLY | O_CREAT | O_EXCL, 0644);
+    if (fd < 0) {
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno
+                                            userInfo:@{NSLocalizedDescriptionKey:
+                                                           [NSString stringWithFormat:
+                                                            WQML(@"RESTORE_ERROR_JOURNAL_WRITE",
+                                                                 @"无法写入恢复日志（errno %d）"), errno]}];
+        return NO;
+    }
+    const uint8_t *bytes = data.bytes;
+    NSUInteger offset = 0;
+    BOOL written = YES;
+    int failureErrno = 0;
+    while (offset < data.length) {
+        ssize_t count = write(fd, bytes + offset, data.length - offset);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) { written = NO; failureErrno = errno; break; }
+        offset += (NSUInteger)count;
+    }
+    if (written && fsync(fd) != 0) { written = NO; failureErrno = errno; }
+    close(fd);
+    if (written && rename(temporary.fileSystemRepresentation, path.fileSystemRepresentation) != 0) {
+        written = NO;
+        failureErrno = errno;
+    }
+    if (!written) {
+        unlink(temporary.fileSystemRepresentation);
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:failureErrno
+                                            userInfo:@{NSLocalizedDescriptionKey:
+                                                           [NSString stringWithFormat:
+                                                            WQML(@"RESTORE_ERROR_JOURNAL_WRITE",
+                                                                 @"无法写入恢复日志（errno %d）"), failureErrno]}];
+        return NO;
+    }
+    if (!WQMRestoreSyncDirectory(directory)) {
+        if (error) *error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno
+                                            userInfo:@{NSLocalizedDescriptionKey:
+                                                           WQML(@"RESTORE_ERROR_JOURNAL_SYNC",
+                                                                @"无法将恢复日志写入磁盘")}];
+        return NO;
+    }
+    return YES;
 }
 
 static BOOL WQMRestoreAllowedPart(NSString *part)
@@ -378,9 +449,17 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
     WQMLoadController *load = [WQMLoadController controllerForCurrentPreferences];
     dispatch_async(dispatch_get_global_queue(load.plan.qos, 0), ^{
         for (NSDictionary *journal in WQMRestoreJournals()) {
-            if ([journal[@"State"] isEqualToString:@"Active"]) {
+            NSString *state = journal[@"State"];
+            if ([state isEqualToString:@"Active"]) {
                 finish(NO, WQML(@"RESTORE_ERROR_ACTIVE_JOURNAL",
                                 @"存在尚未处理的恢复日志，请先修复上次中断的操作。"), nil);
+                return;
+            }
+            if (![state isEqualToString:@"Committed"]) {
+                finish(NO, [NSString stringWithFormat:
+                            WQML(@"RESTORE_ERROR_JOURNAL_INVALID",
+                                 @"恢复日志无法读取或状态未知：%@。请检查 Documents/RestoreRecovery 后重试。"),
+                            [journal[@"JournalPath"] lastPathComponent]], nil);
                 return;
             }
         }
@@ -478,6 +557,22 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
                     return;
                 }
 
+                int targetPID = wq_process_id_for_bundle(app.bundleIdentifier);
+                if (targetPID > 0) {
+                    finish(NO, [NSString stringWithFormat:
+                                WQML(@"RESTORE_ERROR_APP_RUNNING",
+                                     @"目标 App 正在运行（pid %d）。请从多任务界面关闭它后再试。"),
+                                targetPID], nil);
+                    return;
+                }
+                unsigned long long freeBytes = WQMAppsSupportVolumeAvailableBytes(app.containerPath);
+                if (freeBytes < WQM_MIN_FREE_SPACE) {
+                    finish(NO, [NSString stringWithFormat:
+                                WQML(@"RESTORE_ERROR_NO_SPACE",
+                                     @"可用空间不足：至少需要 %@，当前 %@。未修改目标 App。"),
+                                WQMFormatBytes(WQM_MIN_FREE_SPACE), WQMFormatBytes(freeBytes)], nil);
+                    return;
+                }
                 NSString *journalPath = [WQMRestoreDirectory()
                     stringByAppendingPathComponent:[NSUUID.UUID.UUIDString stringByAppendingString:@".plist"]];
                 operation.journalPath = journalPath;
@@ -511,9 +606,15 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
                     NSMutableDictionary *committed = [journal mutableCopy];
                     committed[@"State"] = @"Committed";
                     committed[@"Completed"] = NSDate.date;
-                    NSError *writeError = nil;
-                    (void)WQMRestoreWriteJournal(committed, journalPath, &writeError);
-                    [NSFileManager.defaultManager removeItemAtPath:journalPath error:nil];
+                    if (!WQMRestoreWriteJournal(committed, journalPath, NULL) ||
+                        !WQMRestoreRemoveJournal(journalPath)) {
+                        NSString *donePath = [journalPath stringByAppendingString:@".done"];
+                        if (rename(journalPath.fileSystemRepresentation,
+                                   donePath.fileSystemRepresentation) == 0) {
+                            WQMRestoreSyncDirectory(journalPath.stringByDeletingLastPathComponent);
+                        }
+                        wq_log(@"restore %@: journal cleanup failed, demoted %@", app.bundleIdentifier, donePath);
+                    }
                     wq_log(@"restore %@: OK from %@; safety %@", app.bundleIdentifier,
                            backup.path, safety.path);
                     finish(YES, [NSString stringWithFormat:
@@ -527,7 +628,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
                 NSString *rollbackError = nil;
                 BOOL rolledBack = WQMRestoreApply(app.containerPath, requestedParts, safety, load, &rollbackError);
                 if (rolledBack) {
-                    [NSFileManager.defaultManager removeItemAtPath:journalPath error:nil];
+                    (void)WQMRestoreRemoveJournal(journalPath);
                     operation.status = WQMOperationStatusRolledBack;
                     wq_log(@"restore %@: FAILED (%@), rolled back from %@", app.bundleIdentifier,
                            applyError ?: @"unknown", safety.path);
@@ -554,15 +655,38 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
 
 + (nullable NSString *)activeRecoverySummary
 {
+    NSString *invalidName = nil;
     for (NSDictionary *journal in WQMRestoreJournals()) {
-        if (![journal[@"State"] isEqualToString:@"Active"]) continue;
-        NSString *name = journal[@"DisplayName"];
-        NSString *bundleID = journal[@"BundleID"];
-        return [NSString stringWithFormat:@"%@（%@）",
-                name ?: bundleID ?: WQML(@"UNKNOWN_APP", @"未知 App"),
-                bundleID ?: @"unknown"];
+        NSString *state = journal[@"State"];
+        if ([state isEqualToString:@"Active"]) {
+            NSString *name = journal[@"DisplayName"];
+            NSString *bundleID = journal[@"BundleID"];
+            return [NSString stringWithFormat:@"%@（%@）",
+                    name ?: bundleID ?: WQML(@"UNKNOWN_APP", @"未知 App"),
+                    bundleID ?: @"unknown"];
+        }
+        if (![state isEqualToString:@"Committed"] && !invalidName) {
+            invalidName = [journal[@"JournalPath"] lastPathComponent];
+        }
+    }
+    if (invalidName) {
+        return [NSString stringWithFormat:
+                WQML(@"RECOVERY_SUMMARY_INVALID", @"发现无法读取的恢复日志：%@"), invalidName];
     }
     return nil;
+}
+
++ (NSArray<NSString *> *)pendingRecoveryBackupPaths
+{
+    NSMutableArray<NSString *> *paths = [NSMutableArray new];
+    for (NSDictionary *journal in WQMRestoreJournals()) {
+        if (![journal[@"State"] isEqualToString:@"Active"]) continue;
+        for (NSString *key in @[@"SourceBackup", @"SafetyBackup"]) {
+            id value = journal[key];
+            if ([value isKindOfClass:NSString.class] && [value length]) [paths addObject:value];
+        }
+    }
+    return paths;
 }
 
 + (void)recoverActiveRecoveryWithProgress:(nullable void (^)(NSString *status))progress
@@ -593,6 +717,14 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
             }
         }
         if (!active) {
+            for (NSDictionary *journal in WQMRestoreJournals()) {
+                if ([journal[@"State"] isEqualToString:@"Committed"]) continue;
+                finish(NO, [NSString stringWithFormat:
+                            WQML(@"RECOVERY_ERROR_JOURNAL_INVALID",
+                                 @"恢复日志无法读取或状态未知：%@，需要人工检查。"),
+                            [journal[@"JournalPath"] lastPathComponent]], nil);
+                return;
+            }
             finish(NO, WQML(@"RECOVERY_ERROR_NONE", @"没有需要修复的中断恢复。"), nil);
             return;
         }
@@ -606,8 +738,17 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
         NSString *container = active[@"Container"];
         NSArray *parts = active[@"RequestedParts"];
         NSString *safetyPath = active[@"SafetyBackup"];
+        BOOL partsValid = [parts isKindOfClass:NSArray.class];
+        if (partsValid) {
+            for (id part in parts) {
+                if (![part isKindOfClass:NSString.class] || !WQMRestoreAllowedPart(part)) {
+                    partsValid = NO;
+                    break;
+                }
+            }
+        }
         if (!WQAppsSupportBundleIDValid(bundleID) || ![container isKindOfClass:NSString.class] ||
-            ![parts isKindOfClass:NSArray.class] || ![safetyPath isKindOfClass:NSString.class]) {
+            !partsValid || ![safetyPath isKindOfClass:NSString.class]) {
             finish(NO, WQML(@"RECOVERY_ERROR_INVALID_JOURNAL", @"恢复日志字段无效，需要人工检查。"), nil);
             return;
         }
@@ -632,13 +773,26 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
                             @"无法取得目标 App 的访问权限，不能自动回滚。"), nil);
             return;
         }
+        if (![wq_container_label(container) isEqualToString:bundleID]) {
+            finish(NO, WQML(@"RECOVERY_ERROR_ID_MISMATCH",
+                            @"目标 App 的容器标识不再匹配，不能自动回滚。"), nil);
+            return;
+        }
+        int targetPID = wq_process_id_for_bundle(bundleID);
+        if (targetPID > 0) {
+            finish(NO, [NSString stringWithFormat:
+                        WQML(@"RECOVERY_ERROR_APP_RUNNING",
+                             @"目标 App 正在运行（pid %d），请从多任务界面关闭它后再修复。"),
+                        targetPID], nil);
+            return;
+        }
         report(WQML(@"RECOVERY_PROGRESS", @"正在回滚上次中断的恢复…"));
         if (!WQMRestoreApply(container, parts, safety, load, &reason)) {
             finish(NO, reason ?: WQML(@"RECOVERY_ERROR_FAILED", @"中断恢复回滚失败。"), nil);
             return;
         }
         NSString *journalPath = active[@"JournalPath"];
-        [NSFileManager.defaultManager removeItemAtPath:journalPath error:nil];
+        (void)WQMRestoreRemoveJournal(journalPath);
         finish(YES, WQML(@"RECOVERY_SUCCESS", @"已从自动安全备份回滚上次中断的恢复。"), nil);
     });
 }

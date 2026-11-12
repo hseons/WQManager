@@ -6,6 +6,21 @@ semantic versioning once it reaches 1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Recovery journals are written with an fsync'd temporary file and directory
+  sync before the destructive phase, and journals that are unreadable or in an
+  unknown state now block new restores instead of being ignored.
+- Backup manifests are fsync'd before publishing, and a backup whose publish
+  validation fails is removed instead of leaving an invisible directory.
+- A restore that succeeded but could not remove its journal demotes the
+  journal to `.done` so it cannot be mistaken for an interrupted restore.
+- Finished restores record their journal cleanup failures instead of silently
+  ignoring them.
+- Deletes are refused while a backup is referenced by an unfinished restore.
+- The app removes stale `.incomplete-*`, import, export and journal temp files
+  at launch.
+
 ### Added
 
 - Settings → Data → "Backup & restore load": Standard, Automatic (default) and

@@ -636,6 +636,15 @@ static NSString *WQMBackupReasonText(NSString *reason)
         [final addAction:[UIAlertAction actionWithTitle:WQML(@"DELETE_PERMANENTLY", @"永久删除") style:UIAlertActionStyleDestructive
                                                 handler:^(__unused UIAlertAction *a) {
             if (![self->_deleteGate authorizeExecutionForOperation:operation]) return;
+            NSString *standardized = backup.path.stringByStandardizingPath;
+            for (NSString *pending in [WQMRestoreService pendingRecoveryBackupPaths]) {
+                if ([pending.stringByStandardizingPath isEqualToString:standardized]) {
+                    [WQMAlertPresenter presentAlertWithTitle:WQML(@"DELETE_BACKUP_REFERENCED_TITLE", @"无法删除")
+                                                     message:WQML(@"DELETE_BACKUP_REFERENCED_MESSAGE",
+                                                                  @"该备份正被一次未完成的恢复引用，请先完成修复后再删除。")];
+                    return;
+                }
+            }
             if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"DELETE_PROGRESS_TITLE", @"正在删除")
                                                           status:nil
                                                    cancelHandler:nil]) return;

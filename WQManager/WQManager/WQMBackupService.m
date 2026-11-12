@@ -8,10 +8,30 @@
 #import "WQAppsSupport.h"
 
 #import <errno.h>
+#import <fcntl.h>
 #import <sys/stat.h>
+#import <unistd.h>
 
 static NSString *const kWQMBackupManifestName = @"manifest.plist";
 static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
+
+static BOOL WQMSyncFile(NSString *path)
+{
+    int fd = open(path.fileSystemRepresentation, O_RDONLY);
+    if (fd < 0) return NO;
+    BOOL ok = (fsync(fd) == 0);
+    close(fd);
+    return ok;
+}
+
+static BOOL WQMSyncDirectory(NSString *path)
+{
+    int fd = open(path.fileSystemRepresentation, O_RDONLY);
+    if (fd < 0) return NO;
+    BOOL ok = (fsync(fd) == 0);
+    close(fd);
+    return ok;
+}
 
 @implementation WQMBackupService
 
@@ -94,6 +114,18 @@ static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
         NSError *fileError = nil;
         if (![fm createDirectoryAtPath:root withIntermediateDirectories:YES attributes:nil error:&fileError]) {
             finish(nil, fileError);
+            return;
+        }
+
+        unsigned long long freeBytes = WQMAppsSupportVolumeAvailableBytes(root);
+        if (freeBytes < WQM_MIN_FREE_SPACE) {
+            finish(nil, [NSError errorWithDomain:@"WQMBackupService" code:6
+                                        userInfo:@{NSLocalizedDescriptionKey:
+                                                       [NSString stringWithFormat:
+                                                        WQML(@"BACKUP_ERROR_NO_SPACE",
+                                                             @"可用空间不足：至少需要 %@，当前 %@。"),
+                                                        WQMFormatBytes(WQM_MIN_FREE_SPACE),
+                                                        WQMFormatBytes(freeBytes)]}]);
             return;
         }
 
@@ -224,6 +256,9 @@ static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
         if (!failure && ![manifest writeToFile:manifestPath atomically:YES]) {
             failure = WQML(@"BACKUP_ERROR_WRITE_MANIFEST", @"无法写入备份清单");
         }
+        if (!failure && (!WQMSyncFile(manifestPath) || !WQMSyncDirectory(staging))) {
+            failure = WQML(@"BACKUP_ERROR_SYNC", @"无法将备份写入磁盘");
+        }
 
         WQMBackupRecord *record = nil;
         NSString *finalPath = nil;
@@ -238,6 +273,7 @@ static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
                 failure = [NSString stringWithFormat:
                            WQML(@"BACKUP_ERROR_PUBLISH", @"无法发布备份（errno %d）"), errno];
             } else {
+                (void)WQMSyncDirectory(root);
                 NSString *validationError = nil;
                 record = [WQMBackupRecord recordAtPath:finalPath error:&validationError];
                 if (!record) failure = validationError ?: WQML(@"BACKUP_ERROR_VALIDATION", @"备份校验失败");
@@ -246,6 +282,10 @@ static NSString *const kWQMBackupStagingPrefix = @".incomplete-";
 
         if (failure) {
             if ([fm fileExistsAtPath:staging]) [fm removeItemAtPath:staging error:nil];
+            if (finalPath && [fm fileExistsAtPath:finalPath]) {
+                [fm removeItemAtPath:finalPath error:nil];
+                (void)WQMSyncDirectory(root);
+            }
             wq_log(@"backup %@: FAILED (%@)", app.bundleIdentifier, failure);
             finish(nil, [NSError errorWithDomain:@"WQMBackupService" code:10
                                         userInfo:@{NSLocalizedDescriptionKey: failure}]);

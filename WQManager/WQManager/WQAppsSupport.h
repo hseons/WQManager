@@ -6,11 +6,57 @@
 #include <limits.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 // Portable, side-effect-free validation shared by the Apps implementation and
 // its macOS fixture tests. Filesystem agreement is checked by WQApps.m.
+// A backup or restore refuses to start when the volume is nearly full. The
+// threshold is deliberately small: APFS clones make the logical size a poor
+// predictor of the bytes actually consumed.
+#define WQM_MIN_FREE_SPACE (256ULL * 1024ULL * 1024ULL)
+
+static inline unsigned long long WQMAppsSupportVolumeAvailableBytes(NSString *path)
+{
+    if (!path.length) return 0;
+    NSURL *url = [NSURL fileURLWithPath:path isDirectory:YES];
+    NSNumber *capacity = nil;
+    if ([url getResourceValue:&capacity
+                       forKey:NSURLVolumeAvailableCapacityForImportantUsageKey
+                        error:nil] &&
+        [capacity isKindOfClass:NSNumber.class]) {
+        return capacity.unsignedLongLongValue;
+    }
+    struct statfs info = {0};
+    if (statfs(path.fileSystemRepresentation, &info) == 0) {
+        return (unsigned long long)info.f_bavail * (unsigned long long)info.f_bsize;
+    }
+    return 0;
+}
+
+static inline unsigned long long WQMAppsSupportTreeSize(NSString *path)
+{
+    if (!path.length) return 0;
+    NSFileManager *fm = NSFileManager.defaultManager;
+    BOOL isDirectory = NO;
+    if (![fm fileExistsAtPath:path isDirectory:&isDirectory]) return 0;
+    if (!isDirectory) {
+        NSDictionary *attributes = [fm attributesOfItemAtPath:path error:nil];
+        return [attributes[NSFileSize] unsignedLongLongValue];
+    }
+    unsigned long long total = 0;
+    NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:path];
+    for (NSString *relative in enumerator) {
+        (void)relative;
+        NSDictionary *attributes = [enumerator fileAttributes];
+        if ([attributes[NSFileType] isEqual:NSFileTypeRegular]) {
+            total += [attributes[NSFileSize] unsignedLongLongValue];
+        }
+    }
+    return total;
+}
+
 static inline BOOL WQAppsSupportIsBool(id value)
 {
     return [value isKindOfClass:NSNumber.class] &&

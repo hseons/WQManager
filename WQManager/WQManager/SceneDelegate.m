@@ -12,6 +12,7 @@
 #import "WQMMainTabBarController.h"
 #import "WQMSharedInbox.h"
 #import "WQMTheme.h"
+#import "WQMHousekeeping.h"
 #if DEBUG
 #import "WQMLongOperationBanner.h"
 #endif
@@ -38,6 +39,7 @@
                                              object:nil];
     [self showLegalGateIfNeeded];
     [window makeKeyAndVisible];
+    [WQMHousekeeping runAtLaunch];
 #if DEBUG
     if (getenv("WQM_BANNER_DEMO")) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),

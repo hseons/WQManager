@@ -404,3 +404,21 @@
 
 "COLLAPSE" = "收起";
 "STOPPING" = "正在停止…";
+
+"RESTORE_ERROR_JOURNAL_WRITE" = "无法写入恢复日志（errno %d）";
+"RESTORE_ERROR_JOURNAL_SYNC" = "无法将恢复日志写入磁盘";
+"RESTORE_ERROR_JOURNAL_INVALID" = "恢复日志无法读取或状态未知：%@。请检查 Documents/RestoreRecovery 后重试。";
+"RECOVERY_SUMMARY_INVALID" = "发现无法读取的恢复日志：%@";
+"RECOVERY_ERROR_JOURNAL_INVALID" = "恢复日志无法读取或状态未知：%@，需要人工检查。";
+"RECOVERY_ERROR_ID_MISMATCH" = "目标 App 的容器标识不再匹配，不能自动回滚。";
+
+"BACKUP_ERROR_SYNC" = "无法将备份写入磁盘";
+
+"BACKUP_ERROR_NO_SPACE" = "可用空间不足：至少需要 %@，当前 %@。";
+"RESTORE_ERROR_NO_SPACE" = "可用空间不足：至少需要 %@，当前 %@。未修改目标 App。";
+"ARCHIVE_ERROR_NO_SPACE" = "可用空间不足：至少需要 %@，当前 %@。";
+
+"RESTORE_ERROR_APP_RUNNING" = "目标 App 正在运行（pid %d）。请从多任务界面关闭它后再试。";
+"RECOVERY_ERROR_APP_RUNNING" = "目标 App 正在运行（pid %d）。请从多任务界面关闭它后再修复。";
+"DELETE_BACKUP_REFERENCED_TITLE" = "无法删除";
+"DELETE_BACKUP_REFERENCED_MESSAGE" = "该备份正被一次未完成的恢复引用，请先完成修复后再删除。";

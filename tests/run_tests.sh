@@ -83,3 +83,14 @@ clang \
   -o "$OUTPUT_DIR/WQMLoadControllerTests"
 
 "$OUTPUT_DIR/WQMLoadControllerTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  "$SOURCE_DIR/WQMHousekeeping.m" \
+  "$ROOT/tests/WQMHousekeepingTests.m" \
+  -o "$OUTPUT_DIR/WQMHousekeepingTests"
+
+"$OUTPUT_DIR/WQMHousekeepingTests"
