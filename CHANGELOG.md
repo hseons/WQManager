@@ -4,64 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
-## [Unreleased]
-
-### Fixed
-
-- Recovery journals are written with an fsync'd temporary file and directory
-  sync before the destructive phase, and journals that are unreadable or in an
-  unknown state now block new restores instead of being ignored.
-- Backup manifests are fsync'd before publishing, and a backup whose publish
-  validation fails is removed instead of leaving an invisible directory.
-- A restore that succeeded but could not remove its journal demotes the
-  journal to `.done` so it cannot be mistaken for an interrupted restore.
-- Finished restores record their journal cleanup failures instead of silently
-  ignoring them.
-- Deletes are refused while a backup is referenced by an unfinished restore.
-- The app removes stale `.incomplete-*`, import, export and journal temp files
-  at launch.
-
-### Added
-
-- Settings → Data → "Backup & restore load": Standard, Automatic (default) and
-  Low-load. Automatic backs off when the device reports serious thermal
-  pressure and pauses while it is critical; Low-load always runs at a slower
-  fixed pace.
-- Backup and restore confirmations show the profile that will be used.
-- Long backup, restore, import, export, recovery, delete and clean operations
-  now report through a floating capsule below the status bar instead of a
-  blocking alert. The rest of the app stays usable while the operation runs.
-- The app action sheet (quick/full backup, restore, copy Bundle ID) now
-  blurs the screen behind it so the sheet reads as a separate layer.
-- Tap the capsule to expand it into a drawer with the live status, a stop
-  action when available, and a collapse button. The drawer springs open
-  from the capsule and collapses on tap; Reduce Motion skips the spring.
-
-### Changed
-
-- Copying and hashing now run in bounded batches with short pauses instead of
-  holding peak CPU and flash throughput for the whole operation. SHA-256,
-  safety backups, recovery journals and rollback are unchanged.
-- Low-load restore replaces two full verification reads with metadata checks
-  (6 → 3 full reads). The standard profile keeps every full read.
-- Backup and restore keep the screen awake while they run.
-
 ## [0.3.0] — 2026-11-12
 
 ### Added
 
-- Settings → About → Telegram Channel: opens
-  [t.me/TheBallnow](https://t.me/TheBallnow).
+- Low-load profile (Standard / Automatic / Low-load); Automatic follows thermal
+  pressure, Low-load always runs slower and cooler.
+- Long operations move into a top capsule; tap to expand, keep using the app.
+- The app action sheet blurs the screen behind it.
+- Telegram channel link in Settings → About.
 
 ### Changed
 
-- Backup computes the directory identity, the structure signature and the byte
-  total in one tree walk, and no longer re-walks the source after copying
-  (6 → 4 metadata passes; the single data read is unchanged).
-- Restore reuses the hashes the safety backup already computed during its
-  read-back instead of hashing the safety backup a second time (6 → 5 full
-  reads). The source verification, target check and post-copy verification are
-  unchanged.
+- Backup: 6 → 4 metadata passes. Restore: 6 → 5 full reads; Low-load: 3.
+- Copying and hashing run in bounded batches with short pauses.
+
+### Fixed
+
+- Restore journals and backup manifests are fsync'd; corrupt journals block
+  new restores.
+- No invisible backup directory after a failed publish; stale temp files are
+  cleaned at launch.
+- Free-space check, delete protection for referenced backups, running-app check.
 
 ## [0.2.1] — 2026-11-11
 

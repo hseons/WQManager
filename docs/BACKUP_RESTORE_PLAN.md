@@ -1,6 +1,6 @@
 # Backup & Restore Load Plan
 
-Status: Phase 1 shipped in 0.3.0 · Phase 2 implemented on main (unreleased)
+Status: Phase 1 and Phase 2 shipped in 0.3.0
 Related: [issue #1](https://github.com/hseons/WQManager/issues/1)
 
 ## 1. Problem
