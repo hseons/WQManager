@@ -18,7 +18,7 @@
 | App Group | `group.mumu.wqmanager` |
 | Scheme | `WQManager` |
 | Deployment target | `26.0` |
-| Marketing version | `0.3.0` |
+| Marketing version | `0.3.1` |
 
 If you fork the project, change the bundle identifiers, the App Group, and the
 entitlements of **both** targets to your own values. The app and the share
