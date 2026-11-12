@@ -1,4 +1,5 @@
 #import "WQMSharedInbox.h"
+#import "WQAppsSupport.h"
 
 NSString *const WQMSharedAppGroupIdentifier = @"group.mumu.wqmanager";
 static NSString *const kWQMInboxDirectory = @"Library/WQMImportInbox";
@@ -116,4 +117,35 @@ static NSString *const kWQMBackupExtension = @"wqbackup";
     return destination;
 }
 
+
++ (nullable NSString *)inboxPath
+{
+    return [self inboxURLCreatingIfNeeded:NO error:nil].path;
+}
+
++ (NSUInteger)purgeStaleItemsOlderThan:(NSTimeInterval)maxAge
+                            freedBytes:(unsigned long long *)freedBytes
+{
+    if (freedBytes) *freedBytes = 0;
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *inbox = [self inboxPath];
+    if (!inbox.length) return 0;
+    NSArray<NSString *> *names = [fm contentsOfDirectoryAtPath:inbox error:nil] ?: @[];
+    NSUInteger removed = 0;
+    unsigned long long freed = 0;
+    for (NSString *name in names) {
+        BOOL isBackup = [name.pathExtension caseInsensitiveCompare:kWQMBackupExtension] == NSOrderedSame;
+        BOOL isIncoming = [name hasPrefix:@"."] && [name hasSuffix:@".incoming"];
+        if (!isBackup && !isIncoming) continue;
+        NSString *path = [inbox stringByAppendingPathComponent:name];
+        NSDictionary<NSFileAttributeKey, id> *attributes = [fm attributesOfItemAtPath:path error:nil];
+        NSDate *modified = attributes[NSFileModificationDate];
+        if (![modified isKindOfClass:NSDate.class]) continue;
+        if (maxAge > 0 && -modified.timeIntervalSinceNow < maxAge) continue;
+        freed += WQMAppsSupportTreeSize(path);
+        if ([fm removeItemAtPath:path error:nil]) removed++;
+    }
+    if (freedBytes) *freedBytes = freed;
+    return removed;
+}
 @end

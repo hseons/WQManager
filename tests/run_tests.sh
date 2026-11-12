@@ -90,6 +90,7 @@ clang \
   -I"$SOURCE_DIR" \
   -framework Foundation \
   "$SOURCE_DIR/WQMHousekeeping.m" \
+  "$SOURCE_DIR/WQMSharedInbox.m" \
   "$ROOT/tests/WQMHousekeepingTests.m" \
   -o "$OUTPUT_DIR/WQMHousekeepingTests"
 
@@ -102,6 +103,7 @@ clang \
   -framework Foundation \
   "$SOURCE_DIR/WQMStorageService.m" \
   "$SOURCE_DIR/WQMBackupStore.m" \
+  "$SOURCE_DIR/WQMSharedInbox.m" \
   "$SOURCE_DIR/WQMLanguageManager.m" \
   "$ROOT/tests/WQMStorageServiceTests.m" \
   -o "$OUTPUT_DIR/WQMStorageServiceTests"

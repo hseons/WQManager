@@ -1,6 +1,7 @@
 #import "WQMStorageService.h"
 #import "WQMBackupStore.h"
 #import "WQAppsSupport.h"
+#import "WQMSharedInbox.h"
 
 static NSString *gWQMStorageBackupRoot;
 static NSString *gWQMStorageTemporaryRoot;
@@ -41,7 +42,8 @@ BOOL WQMStorageReasonIsSafetyBackup(NSString *reason)
 
 + (BOOL)isTemporaryDirectoryName:(NSString *)name
 {
-    return [name hasPrefix:@"WQMImport-"] || [name hasPrefix:@"WQMExport-"];
+    return [name hasPrefix:@"WQMImport-"] || [name hasPrefix:@"WQMExport-"] ||
+           [name hasPrefix:@"WQMSharedImport-"];
 }
 
 + (WQMStorageBreakdown *)breakdown
@@ -88,6 +90,18 @@ BOOL WQMStorageReasonIsSafetyBackup(NSString *reason)
         NSString *path = [temporaryRoot stringByAppendingPathComponent:name];
         breakdown.temporaryBytes += WQMAppsSupportTreeSize(path);
         breakdown.temporaryCount += 1;
+    }
+
+    NSString *inbox = [WQMSharedInbox inboxPath];
+    if (inbox.length) {
+        for (NSString *name in [fm contentsOfDirectoryAtPath:inbox error:nil] ?: @[]) {
+            BOOL isBackup = [name.pathExtension caseInsensitiveCompare:@"wqbackup"] == NSOrderedSame;
+            BOOL isIncoming = [name hasPrefix:@"."] && [name hasSuffix:@".incoming"];
+            if (!isBackup && !isIncoming) continue;
+            breakdown.temporaryBytes += WQMAppsSupportTreeSize(
+                [inbox stringByAppendingPathComponent:name]);
+            breakdown.temporaryCount += 1;
+        }
     }
 
     NSString *cacheRoot = [self cacheRoot];
@@ -145,9 +159,19 @@ BOOL WQMStorageReasonIsSafetyBackup(NSString *reason)
             if (![self isTemporaryDirectoryName:name]) continue;
             NSString *path = [temporaryRoot stringByAppendingPathComponent:name];
             if ([protected containsObject:path.stringByStandardizingPath]) continue;
+            if ([name hasPrefix:@"WQMSharedImport-"]) {
+                NSDate *modified = [fm attributesOfItemAtPath:path error:nil][NSFileModificationDate];
+                if (![modified isKindOfClass:NSDate.class] ||
+                    -modified.timeIntervalSinceNow < 300) {
+                    continue;
+                }
+            }
             freed += WQMAppsSupportTreeSize(path);
             [fm removeItemAtPath:path error:nil];
         }
+        unsigned long long inboxFreed = 0;
+        [WQMSharedInbox purgeStaleItemsOlderThan:3600 freedBytes:&inboxFreed];
+        freed += inboxFreed;
     }
 
     if (freedBytes) *freedBytes = freed;

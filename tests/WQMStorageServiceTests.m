@@ -70,6 +70,13 @@ int main(void)
         [fm createDirectoryAtPath:tempDir withIntermediateDirectories:YES attributes:nil error:nil];
         [@"temp" writeToFile:[tempDir stringByAppendingPathComponent:@"part.bin"]
                   atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        NSString *sharedImport = [tempRoot stringByAppendingPathComponent:@"WQMSharedImport-test.wqbackup"];
+        [fm createDirectoryAtPath:[sharedImport stringByAppendingPathComponent:@"Payload"]
+      withIntermediateDirectories:YES attributes:nil error:nil];
+        [[NSMutableData dataWithLength:512] writeToFile:[sharedImport stringByAppendingPathComponent:@"Payload/p.bin"]
+                                               atomically:YES];
+        [fm setAttributes:@{NSFileModificationDate: [NSDate dateWithTimeIntervalSinceNow:-3600]}
+              ofItemAtPath:sharedImport error:nil];
 
         [WQMStorageService setRootsForTesting:backupRoot temporaryRoot:tempRoot];
 
@@ -78,7 +85,7 @@ int main(void)
         WQMAssert(breakdown.safetyCount == 2, @"two safety backups should be counted");
         WQMAssert(breakdown.invalidCount == 1, @"one invalid backup should be counted");
         WQMAssert(breakdown.incompleteCount == 1, @"one incomplete directory should be counted");
-        WQMAssert(breakdown.temporaryCount == 1, @"one temp directory should be counted");
+        WQMAssert(breakdown.temporaryCount == 2, @"temp and shared import should be counted");
         WQMAssert(breakdown.backupBytes >= 10240, @"backup bytes should include payloads");
         WQMAssert(breakdown.safetyBytes >= 8192, @"safety bytes should include both safety backups");
 
@@ -132,6 +139,7 @@ int main(void)
                                               freedBytes:NULL error:NULL];
         WQMAssert(cleaned, @"temporary cleanup should succeed");
         WQMAssert(![fm fileExistsAtPath:tempDir], @"temp directory should be deleted");
+        WQMAssert(![fm fileExistsAtPath:sharedImport], @"stale shared import should be deleted");
 
         [WQMStorageService setRootsForTesting:nil temporaryRoot:nil];
         [fm removeItemAtPath:root error:nil];

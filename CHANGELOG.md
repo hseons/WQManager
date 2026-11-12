@@ -8,6 +8,7 @@ semantic versioning once it reaches 1.0.
 
 - Storage panel: inspect and clean invalid or interrupted backups and temp files.
 - Keep only the newest automatic safety backup per app.
+- Clean up staging left behind by shared imports.
 
 ## [0.3.0] — 2026-11-12
 

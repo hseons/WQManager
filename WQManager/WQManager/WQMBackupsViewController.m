@@ -334,6 +334,16 @@ static NSString *WQMBackupReasonText(NSString *reason)
     [self importBackupAtURL:url];
 }
 
+static void WQMRemoveSharedImportSource(NSURL *url)
+{
+    if (!url.isFileURL) return;
+    NSString *temporaryRoot = NSTemporaryDirectory().stringByStandardizingPath;
+    NSString *path = url.path.stringByStandardizingPath;
+    if (![path hasPrefix:[temporaryRoot stringByAppendingString:@"/"]]) return;
+    if (![url.lastPathComponent hasPrefix:@"WQMSharedImport-"]) return;
+    [NSFileManager.defaultManager removeItemAtURL:url error:nil];
+}
+
 - (void)importBackupAtURL:(NSURL *)url
 {
     if (!url.isFileURL || _importing) return;
@@ -348,6 +358,7 @@ static NSString *WQMBackupReasonText(NSString *reason)
         }
         WQMLongOperationBanner *banner = WQMLongOperationBanner.shared;
         [self->_archiveService importBackupAtURL:url completion:^(WQMBackupRecord *backup, NSError *error) {
+            WQMRemoveSharedImportSource(url);
             self->_importing = NO;
             [banner hideWithCompletion:^{
                 [self reloadBackups];
