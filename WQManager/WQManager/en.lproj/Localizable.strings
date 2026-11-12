@@ -401,3 +401,6 @@
 "OPERATION_BUSY_TITLE" = "Operation in progress";
 "OPERATION_BUSY_MESSAGE" = "Please wait for the current operation to finish.";
 "LONG_OPERATION_TAP_HINT" = "Tap for details";
+
+"COLLAPSE" = "Collapse";
+"STOPPING" = "Stopping…";

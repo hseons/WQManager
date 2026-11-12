@@ -20,13 +20,22 @@
 
 @property (nonatomic, strong, nullable) WQMBannerWindow *window;
 @property (nonatomic, strong, nullable) UIView *capsule;
+@property (nonatomic, strong, nullable) UIView *headerView;
+@property (nonatomic, strong, nullable) UIView *detailView;
 @property (nonatomic, strong, nullable) UIActivityIndicatorView *spinner;
-@property (nonatomic, strong, nullable) UILabel *label;
+@property (nonatomic, strong, nullable) UILabel *titleLabel;
+@property (nonatomic, strong, nullable) UILabel *statusLabel;
+@property (nonatomic, strong, nullable) UIImageView *chevron;
+@property (nonatomic, strong, nullable) UIButton *stopButton;
+@property (nonatomic, strong, nullable) UIButton *collapseButton;
+@property (nonatomic, strong, nullable) NSLayoutConstraint *heightConstraint;
+@property (nonatomic, strong, nullable) NSLayoutConstraint *expandedWidthConstraint;
 @property (nonatomic, copy, nullable) NSString *titleText;
 @property (nonatomic, copy, nullable) NSString *statusText;
 @property (nonatomic, copy, nullable) void (^cancelHandler)(void);
-@property (nonatomic, weak, nullable) UIAlertController *detailAlert;
 @property (nonatomic, readwrite, getter=isBusy) BOOL busy;
+@property (nonatomic) BOOL expanded;
+@property (nonatomic) BOOL stopping;
 
 @end
 
@@ -73,15 +82,20 @@
     self.cancelHandler = cancelHandler;
     if (![self ensureWindow]) return;
 
-    BOOL wasHidden = self.capsule.alpha < 0.5;
+    BOOL wasHidden = !self.busy;
     self.busy = YES;
+    self.stopping = NO;
+    self.stopButton.enabled = YES;
+    self.stopButton.hidden = (cancelHandler == nil);
+    self.collapseButton.hidden = NO;
     self.window.hidden = NO;
     [self.window.rootViewController.view bringSubviewToFront:self.capsule];
-    [self refreshLabel];
+    [self refreshLabels];
     [self.spinner startAnimating];
     [self.window layoutIfNeeded];
 
     if (wasHidden) {
+        [self resetExpandedState];
         self.capsule.transform = CGAffineTransformMakeTranslation(0, -70);
         self.capsule.alpha = 0;
         if (UIAccessibilityIsReduceMotionEnabled()) {
@@ -96,6 +110,14 @@
             } completion:nil];
         }
     }
+#if DEBUG
+    if (getenv("WQM_BANNER_EXPAND_DEMO")) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [self setExpanded:YES animated:YES];
+        });
+    }
+#endif
 }
 
 - (void)updateStatus:(NSString *)status
@@ -105,7 +127,7 @@
         return;
     }
     self.statusText = status ?: @"";
-    if (self.busy) [self refreshLabel];
+    if (self.busy) [self refreshLabels];
 }
 
 - (void)hide
@@ -124,21 +146,13 @@
         return;
     }
     self.busy = NO;
-    void (^finish)(void) = ^{
-        [self animateOutWithCompletion:^{
-            self.window.hidden = YES;
-            [self.spinner stopAnimating];
-            self.cancelHandler = nil;
-            self.detailAlert = nil;
-            if (completion) completion();
-        }];
-    };
-    UIAlertController *detail = self.detailAlert;
-    if (detail && detail.presentingViewController) {
-        [detail dismissViewControllerAnimated:NO completion:finish];
-    } else {
-        finish();
-    }
+    [self animateOutWithCompletion:^{
+        self.window.hidden = YES;
+        [self.spinner stopAnimating];
+        self.cancelHandler = nil;
+        [self resetExpandedState];
+        if (completion) completion();
+    }];
 }
 
 - (BOOL)ensureWindow
@@ -176,92 +190,235 @@
     blur.userInteractionEnabled = NO;
     [capsule addSubview:blur];
 
+    UIView *header = [UIView new];
+    header.translatesAutoresizingMaskIntoConstraints = NO;
+    [capsule addSubview:header];
+
     UIActivityIndicatorView *spinner =
         [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     spinner.translatesAutoresizingMaskIntoConstraints = NO;
     spinner.color = UIColor.secondaryLabelColor;
     spinner.hidesWhenStopped = NO;
     spinner.userInteractionEnabled = NO;
-    [capsule addSubview:spinner];
+    [header addSubview:spinner];
 
-    UILabel *label = [UILabel new];
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-    label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
-    label.adjustsFontForContentSizeCategory = YES;
-    label.textColor = UIColor.labelColor;
-    label.lineBreakMode = NSLineBreakByTruncatingTail;
-    label.numberOfLines = 1;
-    label.userInteractionEnabled = NO;
-    [label setContentHuggingPriority:UILayoutPriorityDefaultHigh forAxis:UILayoutConstraintAxisHorizontal];
-    [label setContentCompressionResistancePriority:UILayoutPriorityDefaultHigh
-                                           forAxis:UILayoutConstraintAxisHorizontal];
-    [capsule addSubview:label];
+    UILabel *titleLabel = [UILabel new];
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
+    titleLabel.adjustsFontForContentSizeCategory = YES;
+    titleLabel.textColor = UIColor.labelColor;
+    titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    titleLabel.numberOfLines = 1;
+    titleLabel.userInteractionEnabled = NO;
+    [titleLabel setContentHuggingPriority:UILayoutPriorityDefaultHigh forAxis:UILayoutConstraintAxisHorizontal];
+    [titleLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultHigh
+                                                forAxis:UILayoutConstraintAxisHorizontal];
+    [header addSubview:titleLabel];
+
+    UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.down"]];
+    chevron.translatesAutoresizingMaskIntoConstraints = NO;
+    chevron.tintColor = UIColor.tertiaryLabelColor;
+    chevron.contentMode = UIViewContentModeCenter;
+    chevron.userInteractionEnabled = NO;
+    [header addSubview:chevron];
+
+    UIView *detail = [UIView new];
+    detail.translatesAutoresizingMaskIntoConstraints = NO;
+    detail.alpha = 0;
+    [capsule addSubview:detail];
+
+    UILabel *statusLabel = [UILabel new];
+    statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    statusLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    statusLabel.adjustsFontForContentSizeCategory = YES;
+    statusLabel.textColor = UIColor.secondaryLabelColor;
+    statusLabel.numberOfLines = 2;
+    statusLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    [detail addSubview:statusLabel];
+
+    UIButtonConfiguration *stopConfig = [UIButtonConfiguration borderedButtonConfiguration];
+    stopConfig.title = WQML(@"STOP", @"停止");
+    stopConfig.baseForegroundColor = UIColor.systemRedColor;
+    stopConfig.contentInsets = NSDirectionalEdgeInsetsMake(6, 14, 6, 14);
+    UIButton *stopButton = [UIButton buttonWithConfiguration:stopConfig primaryAction:nil];
+    stopButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [stopButton addTarget:self action:@selector(handleStop) forControlEvents:UIControlEventTouchUpInside];
+    [detail addSubview:stopButton];
+
+    UIButtonConfiguration *collapseConfig = [UIButtonConfiguration plainButtonConfiguration];
+    collapseConfig.title = WQML(@"COLLAPSE", @"收起");
+    collapseConfig.baseForegroundColor = UIColor.secondaryLabelColor;
+    collapseConfig.contentInsets = NSDirectionalEdgeInsetsMake(6, 10, 6, 4);
+    UIButton *collapseButton = [UIButton buttonWithConfiguration:collapseConfig primaryAction:nil];
+    collapseButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [collapseButton addTarget:self action:@selector(collapseTapped)
+             forControlEvents:UIControlEventTouchUpInside];
+    [detail addSubview:collapseButton];
 
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self
-                                                                         action:@selector(handleTap)];
-    [capsule addGestureRecognizer:tap];
+                                                                         action:@selector(headerTapped)];
+    [header addGestureRecognizer:tap];
 
     [root.view addSubview:capsule];
 
+    NSLayoutConstraint *height = [capsule.heightAnchor constraintEqualToConstant:44];
     [NSLayoutConstraint activateConstraints:@[
         [capsule.topAnchor constraintEqualToAnchor:root.view.safeAreaLayoutGuide.topAnchor constant:6],
         [capsule.centerXAnchor constraintEqualToAnchor:root.view.centerXAnchor],
         [capsule.leadingAnchor constraintGreaterThanOrEqualToAnchor:root.view.leadingAnchor constant:16],
         [capsule.trailingAnchor constraintLessThanOrEqualToAnchor:root.view.trailingAnchor constant:-16],
-        [capsule.widthAnchor constraintLessThanOrEqualToAnchor:root.view.widthAnchor constant:-32],
-        [capsule.heightAnchor constraintEqualToConstant:44],
+        height,
 
         [blur.leadingAnchor constraintEqualToAnchor:capsule.leadingAnchor],
         [blur.trailingAnchor constraintEqualToAnchor:capsule.trailingAnchor],
         [blur.topAnchor constraintEqualToAnchor:capsule.topAnchor],
         [blur.bottomAnchor constraintEqualToAnchor:capsule.bottomAnchor],
 
-        [spinner.leadingAnchor constraintEqualToAnchor:capsule.leadingAnchor constant:14],
-        [spinner.centerYAnchor constraintEqualToAnchor:capsule.centerYAnchor],
-        [label.leadingAnchor constraintEqualToAnchor:spinner.trailingAnchor constant:10],
-        [label.trailingAnchor constraintEqualToAnchor:capsule.trailingAnchor constant:-16],
-        [label.centerYAnchor constraintEqualToAnchor:capsule.centerYAnchor],
+        [header.leadingAnchor constraintEqualToAnchor:capsule.leadingAnchor],
+        [header.trailingAnchor constraintEqualToAnchor:capsule.trailingAnchor],
+        [header.topAnchor constraintEqualToAnchor:capsule.topAnchor],
+        [header.heightAnchor constraintEqualToConstant:44],
+
+        [spinner.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:14],
+        [spinner.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+
+        [chevron.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-10],
+        [chevron.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+        [chevron.widthAnchor constraintEqualToConstant:28],
+        [chevron.heightAnchor constraintEqualToConstant:28],
+
+        [titleLabel.leadingAnchor constraintEqualToAnchor:spinner.trailingAnchor constant:10],
+        [titleLabel.trailingAnchor constraintEqualToAnchor:chevron.leadingAnchor constant:-6],
+        [titleLabel.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+
+        [detail.leadingAnchor constraintEqualToAnchor:capsule.leadingAnchor constant:16],
+        [detail.trailingAnchor constraintEqualToAnchor:capsule.trailingAnchor constant:-16],
+        [detail.topAnchor constraintEqualToAnchor:header.bottomAnchor constant:6],
+
+        [statusLabel.leadingAnchor constraintEqualToAnchor:detail.leadingAnchor],
+        [statusLabel.trailingAnchor constraintEqualToAnchor:detail.trailingAnchor],
+        [statusLabel.topAnchor constraintEqualToAnchor:detail.topAnchor],
+
+        [stopButton.leadingAnchor constraintEqualToAnchor:detail.leadingAnchor],
+        [stopButton.topAnchor constraintEqualToAnchor:statusLabel.bottomAnchor constant:10],
+        [stopButton.heightAnchor constraintEqualToConstant:32],
+
+        [collapseButton.trailingAnchor constraintEqualToAnchor:detail.trailingAnchor],
+        [collapseButton.centerYAnchor constraintEqualToAnchor:stopButton.centerYAnchor],
+        [collapseButton.heightAnchor constraintEqualToConstant:32],
+
+        [detail.bottomAnchor constraintEqualToAnchor:stopButton.bottomAnchor],
     ]];
 
     window.hidden = YES;
     self.window = window;
     self.capsule = capsule;
+    self.headerView = header;
+    self.detailView = detail;
     self.spinner = spinner;
-    self.label = label;
+    self.titleLabel = titleLabel;
+    self.statusLabel = statusLabel;
+    self.chevron = chevron;
+    self.stopButton = stopButton;
+    self.collapseButton = collapseButton;
+    self.heightConstraint = height;
     self.capsule.alpha = 0;
     return YES;
 }
 
-- (void)refreshLabel
+- (void)refreshLabels
 {
     NSString *title = self.titleText ?: @"";
     NSString *status = self.statusText ?: @"";
-    self.label.text = status.length ? [NSString stringWithFormat:@"%@ · %@", title, status] : title;
-    self.capsule.accessibilityLabel = title;
-    self.capsule.accessibilityValue = status;
-    self.capsule.accessibilityHint = WQML(@"LONG_OPERATION_TAP_HINT", @"轻点查看详情");
+    self.titleLabel.text = title;
+    self.statusLabel.text = status.length ? status : WQML(@"PREPARING", @"准备中…");
+    [self refreshAccessibility];
 }
 
-- (void)handleTap
+- (void)refreshAccessibility
 {
-    if (!self.busy || self.titleText.length == 0) return;
-    UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:self.titleText
-                         message:self.statusText
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:WQML(@"CLOSE", @"关闭")
-                                              style:UIAlertActionStyleCancel handler:nil]];
-    if (self.cancelHandler) {
-        __weak typeof(self) weakSelf = self;
-        [alert addAction:[UIAlertAction actionWithTitle:WQML(@"STOP", @"停止")
-                                                  style:UIAlertActionStyleDestructive
-                                                handler:^(__unused UIAlertAction *action) {
-            void (^cancel)(void) = weakSelf.cancelHandler;
-            if (cancel) cancel();
-        }]];
+    self.capsule.accessibilityLabel = self.titleText ?: @"";
+    self.capsule.accessibilityValue = self.statusText ?: @"";
+    self.headerView.accessibilityHint = self.expanded
+        ? WQML(@"COLLAPSE", @"收起")
+        : WQML(@"LONG_OPERATION_TAP_HINT", @"轻点查看详情");
+}
+
+- (void)headerTapped
+{
+    if (!self.busy) return;
+    [self setExpanded:!self.expanded animated:YES];
+}
+
+- (void)collapseTapped
+{
+    [self setExpanded:NO animated:YES];
+}
+
+- (void)handleStop
+{
+    if (self.stopping) return;
+    void (^cancel)(void) = self.cancelHandler;
+    if (!cancel) return;
+    self.stopping = YES;
+    self.stopButton.enabled = NO;
+    [self updateStatus:WQML(@"STOPPING", @"正在停止…")];
+    cancel();
+}
+
+- (void)setExpanded:(BOOL)expanded animated:(BOOL)animated
+{
+    if (self.expanded == expanded) return;
+    self.expanded = expanded;
+
+    if (expanded) {
+        CGFloat available = self.capsule.superview.bounds.size.width - 32.0;
+        CGFloat wanted = MIN(360.0, available);
+        NSLayoutConstraint *width = [self.capsule.widthAnchor constraintEqualToConstant:wanted];
+        width.priority = UILayoutPriorityRequired - 1;
+        width.active = YES;
+        self.expandedWidthConstraint = width;
+        [self.window layoutIfNeeded];
+        CGFloat detailHeight = [self.detailView
+            systemLayoutSizeFittingSize:CGSizeMake(wanted - 32.0, UILayoutFittingCompressedSize.height)
+            withHorizontalFittingPriority:UILayoutPriorityRequired
+                  verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
+        self.heightConstraint.constant = MAX(100.0, 44.0 + 6.0 + ceil(detailHeight) + 14.0);
+    } else {
+        self.heightConstraint.constant = 44;
+        self.expandedWidthConstraint.active = NO;
+        self.expandedWidthConstraint = nil;
     }
-    self.detailAlert = alert;
-    [WQMAlertPresenter presentViewController:alert animated:YES completion:nil];
+
+    void (^updates)(void) = ^{
+        self.detailView.alpha = expanded ? 1 : 0;
+        self.chevron.transform = expanded ? CGAffineTransformMakeRotation(M_PI) : CGAffineTransformIdentity;
+        [self.window layoutIfNeeded];
+    };
+
+    [self refreshAccessibility];
+    if (!animated || UIAccessibilityIsReduceMotionEnabled()) {
+        updates();
+        return;
+    }
+    [UIView animateWithDuration:0.38 delay:0
+         usingSpringWithDamping:0.82 initialSpringVelocity:0.5
+                        options:UIViewAnimationOptionBeginFromCurrentState |
+                                UIViewAnimationOptionAllowUserInteraction
+                     animations:updates completion:nil];
+}
+
+- (void)resetExpandedState
+{
+    self.expanded = NO;
+    self.stopping = NO;
+    self.heightConstraint.constant = 44;
+    self.expandedWidthConstraint.active = NO;
+    self.expandedWidthConstraint = nil;
+    self.detailView.alpha = 0;
+    self.chevron.transform = CGAffineTransformIdentity;
+    self.stopButton.enabled = YES;
+    [self.window layoutIfNeeded];
 }
 
 - (void)animateOutWithCompletion:(void (^)(void))completion

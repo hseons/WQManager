@@ -15,8 +15,10 @@ semantic versioning once it reaches 1.0.
 - Backup and restore confirmations show the profile that will be used.
 - Long backup, restore, import, export, recovery, delete and clean operations
   now report through a floating capsule below the status bar instead of a
-  blocking alert. Tap the capsule for details; the rest of the app stays
-  usable while the operation runs.
+  blocking alert. The rest of the app stays usable while the operation runs.
+- Tap the capsule to expand it into a drawer with the live status, a stop
+  action when available, and a collapse button. The drawer springs open
+  from the capsule and collapses on tap; Reduce Motion skips the spring.
 
 ### Changed
 
