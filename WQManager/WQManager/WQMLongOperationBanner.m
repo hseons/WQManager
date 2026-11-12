@@ -215,7 +215,11 @@
                                                 forAxis:UILayoutConstraintAxisHorizontal];
     [header addSubview:titleLabel];
 
-    UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.down"]];
+    UIImage *chevronImage = [UIImage systemImageNamed:@"chevron.down"
+                                    withConfiguration:[UIImageSymbolConfiguration
+                                                          configurationWithPointSize:11
+                                                          weight:UIImageSymbolWeightSemibold]];
+    UIImageView *chevron = [[UIImageView alloc] initWithImage:chevronImage];
     chevron.translatesAutoresizingMaskIntoConstraints = NO;
     chevron.tintColor = UIColor.tertiaryLabelColor;
     chevron.contentMode = UIViewContentModeCenter;
@@ -281,11 +285,13 @@
 
         [spinner.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:14],
         [spinner.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+        [spinner.widthAnchor constraintEqualToConstant:20],
+        [spinner.heightAnchor constraintEqualToConstant:20],
 
-        [chevron.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-10],
+        [chevron.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-14],
         [chevron.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
-        [chevron.widthAnchor constraintEqualToConstant:28],
-        [chevron.heightAnchor constraintEqualToConstant:28],
+        [chevron.widthAnchor constraintEqualToConstant:22],
+        [chevron.heightAnchor constraintEqualToConstant:22],
 
         [titleLabel.leadingAnchor constraintEqualToAnchor:spinner.trailingAnchor constant:10],
         [titleLabel.trailingAnchor constraintEqualToAnchor:chevron.leadingAnchor constant:-6],
