@@ -30,3 +30,19 @@ void WQMLoadProfileSetCurrent(WQMLoadProfile profile)
 {
     [NSUserDefaults.standardUserDefaults setInteger:profile forKey:WQMLoadProfilePreferenceKey];
 }
+
+NSString * const WQMBackupRetentionPreferenceKey = @"WQMBackupRetentionLimit";
+
+NSInteger WQMBackupRetentionLimit(void)
+{
+    id value = [NSUserDefaults.standardUserDefaults objectForKey:WQMBackupRetentionPreferenceKey];
+    if (![value isKindOfClass:NSNumber.class]) return 0;
+    NSInteger limit = [value integerValue];
+    if (limit == 1 || limit == 3 || limit == 5 || limit == 10) return limit;
+    return 0;
+}
+
+void WQMBackupRetentionSetLimit(NSInteger limit)
+{
+    [NSUserDefaults.standardUserDefaults setInteger:limit forKey:WQMBackupRetentionPreferenceKey];
+}

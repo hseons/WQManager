@@ -8,6 +8,12 @@ typedef NS_ENUM(NSInteger, WQMBackupScope) {
     WQMBackupScopeCustom,
 };
 
+typedef NS_ENUM(NSInteger, WQMAppSortOrder) {
+    WQMAppSortOrderDefault = 0,
+    WQMAppSortOrderName,
+    WQMAppSortOrderSizeDescending,
+};
+
 @interface WQMAppModel : NSObject
 
 @property (nonatomic, copy) NSString *bundleIdentifier;
@@ -21,6 +27,15 @@ typedef NS_ENUM(NSInteger, WQMBackupScope) {
 @property (nonatomic) ino_t containerInode;
 - (NSString *)formattedSize;
 - (NSString *)statusText;
+
+/// Lowercase pinyin initials of `displayName` so searching "wx" finds 微信.
+/// Latin names keep their first letter ("WeChat" → "w").
+@property (nonatomic, copy, readonly) NSString *searchInitials;
+
++ (NSString *)searchInitialsForName:(NSString *)name;
+
+/// Returns `apps` unchanged for WQMAppSortOrderDefault so the scan order survives.
++ (NSArray<WQMAppModel *> *)apps:(NSArray<WQMAppModel *> *)apps sortedByOrder:(WQMAppSortOrder)order;
 
 - (instancetype)init NS_UNAVAILABLE;
 + (instancetype)new NS_UNAVAILABLE;

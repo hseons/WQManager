@@ -7,10 +7,21 @@
 #import "WQMCreditsViewController.h"
 #import "WQMMarkdownRenderer.h"
 #import "WQMStorageViewController.h"
+#import "WQMTrashViewController.h"
+#import "WQMTrashStore.h"
 #import "WQMOperationStore.h"
 #import "WQMPreferences.h"
 #import "WQMTheme.h"
 #import "WQAccess.h"
+#import "WQMBackupStore.h"
+#import "WQMStorageService.h"
+#import "WQMRestoreService.h"
+
+static NSString *WQMBackupRetentionName(NSInteger limit)
+{
+    if (limit <= 0) return WQML(@"BACKUP_RETENTION_ALL", @"全部保留");
+    return [NSString stringWithFormat:WQML(@"BACKUP_RETENTION_COUNT", @"每个 App 保留 %ld 份"), (long)limit];
+}
 
 static NSString *WQMLoadProfileName(WQMLoadProfile profile)
 {
@@ -120,8 +131,17 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
     WQMSettingsRowNotices,
 };
 
+static NSString *WQMTrashBytesText(unsigned long long bytes)
+{
+    NSByteCountFormatter *formatter = [NSByteCountFormatter new];
+    formatter.countStyle = NSByteCountFormatterCountStyleFile;
+    formatter.allowedUnits = NSByteCountFormatterUseAll;
+    return [formatter stringFromByteCount:(long long)bytes];
+}
+
 @implementation WQMSettingsViewController {
     NSString *_versionText;
+    BOOL _presentedFixtureTrash;
     NSString *_signingText;
     NSString *_indexText;
     NSString *_languageText;
@@ -167,6 +187,18 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
+#if DEBUG
+    if ([NSProcessInfo.processInfo.environment[@"WQM_UI_TRASH"] boolValue] && !_presentedFixtureTrash) {
+        _presentedFixtureTrash = YES;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            if ([NSProcessInfo.processInfo.environment[@"WQM_UI_TRASH_EMPTY"] boolValue]) {
+                [WQMTrashStore emptyAll];
+            }
+            [self.navigationController pushViewController:[WQMTrashViewController new] animated:NO];
+        });
+    }
+#endif
 #if DEBUG
     if ([NSProcessInfo.processInfo.environment[@"WQM_UI_SETTINGS_SCROLL"] boolValue]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
@@ -223,7 +255,7 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
     if (section == 0) return 4;
-    if (section == 1) return 6;
+    if (section == 1) return 8;
     if (section == 2) return 4;
     return 2;
 }
@@ -313,9 +345,25 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
         content.image = [UIImage systemImageNamed:@"thermometer.medium"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 1 && indexPath.row == 5) {
+        content.text = WQML(@"SETTINGS_BACKUP_RETENTION", @"备份保留");
+        content.secondaryText = [NSString stringWithFormat:
+                                 WQML(@"SETTINGS_BACKUP_RETENTION_SUB", @"当前：%@"),
+                                 WQMBackupRetentionName(WQMBackupRetentionLimit())];
+        content.image = [UIImage systemImageNamed:@"archivebox"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    } else if (indexPath.section == 1 && indexPath.row == 6) {
         content.text = WQML(@"SETTINGS_STORAGE", @"存储占用");
         content.secondaryText = WQML(@"SETTINGS_STORAGE_SUB", @"查看备份、临时文件与缓存");
         content.image = [UIImage systemImageNamed:@"internaldrive"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    } else if (indexPath.section == 1 && indexPath.row == 7) {
+        NSUInteger count = WQMTrashStore.itemCount;
+        content.text = WQML(@"SETTINGS_TRASH", @"空间透镜回收站");
+        content.secondaryText = count
+            ? [NSString stringWithFormat:WQML(@"SETTINGS_TRASH_SUB", @"%lu 项 · %@"),
+               (unsigned long)count, WQMTrashBytesText(WQMTrashStore.totalBytes)]
+            : WQML(@"SETTINGS_TRASH_SUB_EMPTY", @"还没有删除过文件");
+        content.image = [UIImage systemImageNamed:@"trash"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (indexPath.section == 3 && indexPath.row == 0) {
         content.text = WQML(@"TELEGRAM_CHANNEL", @"Telegram 频道");
@@ -374,7 +422,15 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
         return;
     }
     if (indexPath.section == 1 && indexPath.row == 5) {
+        [self showBackupRetentionSelectorFromCell:[tableView cellForRowAtIndexPath:indexPath]];
+        return;
+    }
+    if (indexPath.section == 1 && indexPath.row == 6) {
         [self.navigationController pushViewController:[WQMStorageViewController new] animated:YES];
+        return;
+    }
+    if (indexPath.section == 1 && indexPath.row == 7) {
+        [self.navigationController pushViewController:[WQMTrashViewController new] animated:YES];
         return;
     }
     if (indexPath.section == 1 && indexPath.row == 1) {
@@ -561,6 +617,86 @@ typedef NS_ENUM(NSInteger, WQMSettingsRow) {
     sheet.popoverPresentationController.sourceView = cell ?: self.tableView;
     sheet.popoverPresentationController.sourceRect = cell ? cell.bounds : CGRectZero;
     [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)showBackupRetentionSelectorFromCell:(UITableViewCell *)cell
+{
+    NSInteger current = WQMBackupRetentionLimit();
+    UIAlertController *sheet = [UIAlertController
+        alertControllerWithTitle:WQML(@"SETTINGS_BACKUP_RETENTION", @"备份保留")
+                         message:WQML(@"BACKUP_RETENTION_FOOTER",
+                                      @"超出保留数量的旧备份会被自动删除。"
+                                       "恢复前自动安全备份不受影响，仍按自己的规则保留最新一份。")
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSNumber *number in @[@0, @1, @3, @5, @10]) {
+        NSInteger limit = number.integerValue;
+        NSString *title = [NSString stringWithFormat:@"%@%@",
+                           limit == current ? @"✓ " : @"",
+                           WQMBackupRetentionName(limit)];
+        [sheet addAction:[UIAlertAction actionWithTitle:title
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__unused UIAlertAction *action) {
+            [self applyBackupRetentionLimit:limit];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"CANCEL", @"取消")
+                                              style:UIAlertActionStyleCancel handler:nil]];
+    sheet.popoverPresentationController.sourceView = cell ?: self.tableView;
+    sheet.popoverPresentationController.sourceRect = cell ? cell.bounds : CGRectZero;
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)applyBackupRetentionLimit:(NSInteger)limit
+{
+    WQMBackupRetentionSetLimit(limit);
+    [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:5 inSection:1]]
+                          withRowAnimation:UITableViewRowAnimationNone];
+    if (limit <= 0) {
+        [self reloadState];
+        return;
+    }
+    UIAlertController *confirm = [UIAlertController
+        alertControllerWithTitle:WQML(@"BACKUP_RETENTION_CONFIRM_TITLE", @"立即清理旧备份？")
+                         message:[NSString stringWithFormat:
+                                  WQML(@"BACKUP_RETENTION_CONFIRM_MESSAGE",
+                                       @"将按“%@”删除更旧的备份，删除后无法恢复。"),
+                                  WQMBackupRetentionName(limit)]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:WQML(@"CANCEL", @"取消")
+                                               style:UIAlertActionStyleCancel handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:WQML(@"BACKUP_RETENTION_APPLY", @"立即清理")
+                                               style:UIAlertActionStyleDestructive
+                                               handler:^(__unused UIAlertAction *action) {
+        [self pruneBackupsForRetentionLimit:limit];
+    }]];
+    [self presentViewController:confirm animated:YES completion:nil];
+}
+
+- (void)pruneBackupsForRetentionLimit:(NSInteger)limit
+{
+    NSSet<NSString *> *protectedPaths = [NSSet setWithArray:[WQMRestoreService pendingRecoveryBackupPaths]];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSUInteger removed = [WQMStorageService pruneBackupsKeeping:(NSUInteger)limit
+                                                         excluding:protectedPaths
+                                                      deletedBytes:NULL];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (removed) {
+                [NSNotificationCenter.defaultCenter postNotificationName:WQMBackupStoreDidChangeNotification
+                                                                 object:nil];
+            }
+            NSString *message = removed
+                ? [NSString stringWithFormat:WQML(@"BACKUP_RETENTION_CLEANED", @"已清理 %lu 份旧备份"),
+                   (unsigned long)removed]
+                : WQML(@"BACKUP_RETENTION_NOTHING", @"没有需要清理的备份");
+            UIAlertController *done = [UIAlertController
+                alertControllerWithTitle:WQML(@"SETTINGS_BACKUP_RETENTION", @"备份保留")
+                                 message:message
+                          preferredStyle:UIAlertControllerStyleAlert];
+            [done addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"好")
+                                                     style:UIAlertActionStyleCancel handler:nil]];
+            [self presentViewController:done animated:YES completion:nil];
+        });
+    });
 }
 
 - (void)cleanDoubleConfirmToggled:(UISwitch *)sender

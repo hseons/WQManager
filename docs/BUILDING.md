@@ -18,7 +18,7 @@
 | App Group | `group.mumu.wqmanager` |
 | Scheme | `WQManager` |
 | Deployment target | `26.0` |
-| Marketing version | `0.3.1` |
+| Marketing version | `0.3.2` |
 
 If you fork the project, change the bundle identifiers, the App Group, and the
 entitlements of **both** targets to your own values. The app and the share
@@ -97,10 +97,25 @@ only in `DEBUG` builds.
 | `WQM_ICON_DIAG_ALL=1` | diagnose every scanned app (default: first 12) |
 | `WQM_ICON_DIAG_DUMP=1` | dump raw icon records to `Documents/` |
 | `WQM_ICON_REMOTE=0` | disable App Store artwork lookup |
-| `WQM_UI_FIXTURES=1` | use fixed demo data instead of scanning |
+| `WQM_UI_FIXTURES=1` | use fixed demo data instead of scanning; also seeds four demo backups |
 | `WQM_UI_FIXTURES_TAB=n` | open tab `n` (0 apps, 1 backups, 2 cleaner, 3 history, 4 settings) |
 | `WQM_UI_HISTORY_EXPAND=1` | expand all history groups |
 | `WQM_UI_SETTINGS_DOC=n` | push document row `n` in Settings |
+| `WQM_UI_SETTINGS_SCROLL=1` | scroll Settings to the bottom |
+| `WQM_UI_BACKUP_QUERY=wx` | prefill the backup search field |
+| `WQM_UI_ACTION_PANEL=1` | open the action sheet for the first app |
+| `WQM_UI_LENS=1` | push the Space Lens for the first app (fixture app 微信 gets a synthetic 13.71 GB container) |
+| `WQM_UI_LENS_APP=com.tencent.xin` | pick which app the Space Lens opens |
+| `WQM_UI_LENS_DRILL=Library/WeChatMM` | drill straight into that folder path |
+| `WQM_UI_LENS_PREVIEW=settings.json` | open the file preview for that name in the current level |
+| `WQM_UI_LENS_LIST=1` | open the Space Lens in list mode |
+| `WQM_UI_LENS_PICK=2` | with list mode, select the first two rows (shows the action bar) |
+| `WQM_UI_LENS_EXPORT=1` | run the export flow for the current selection |
+| `WQM_UI_LENS_DELETE_PROMPT=1` | open the delete confirmation for the current selection |
+| `WQM_UI_LENS_DELETE_NOW=1` | delete the selection without the dialogs (skips confirmation, for screenshots only) |
+| `WQM_UI_TRASH=1` | open Settings and push the Space Lens bin straight away |
+| `WQM_UI_TRASH_EMPTY=1` | empty the bin before pushing it (shows the empty state) |
+| `WQM_UI_APPEARANCE=light` | force the window into light mode (`dark` for dark) |
 
 Icon diagnostics are written to `Documents/icon-diag-<timestamp>.log` inside the
 app container and are visible through the Files app

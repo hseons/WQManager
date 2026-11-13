@@ -26,4 +26,12 @@ FOUNDATION_EXPORT NSString * const WQMLoadProfilePreferenceKey;
 WQMLoadProfile WQMLoadProfileCurrent(void);
 void WQMLoadProfileSetCurrent(WQMLoadProfile profile);
 
+/// How many backups of one app (per scope) to keep. `0` keeps every backup.
+/// Every other value triggers automatic removal of the oldest ones.
+FOUNDATION_EXPORT NSString * const WQMBackupRetentionPreferenceKey;
+
+/// One of 0 (keep all), 1, 3, 5 or 10. Unknown values fall back to 0.
+NSInteger WQMBackupRetentionLimit(void);
+void WQMBackupRetentionSetLimit(NSInteger limit);
+
 NS_ASSUME_NONNULL_END

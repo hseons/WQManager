@@ -238,4 +238,48 @@ BOOL WQMStorageReasonIsSafetyBackup(NSString *reason)
     return removed;
 }
 
+
++ (NSUInteger)pruneBackupsKeeping:(NSUInteger)keep
+                        excluding:(NSSet<NSString *> *)protectedPaths
+                     deletedBytes:(unsigned long long *)deletedBytes
+{
+    if (keep == 0) return 0;
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSMutableSet<NSString *> *protected = [NSMutableSet set];
+    for (NSString *path in protectedPaths) {
+        if ([path isKindOfClass:NSString.class] && path.length) {
+            [protected addObject:path.stringByStandardizingPath];
+        }
+    }
+
+    NSMutableDictionary<NSString *, NSMutableArray<WQMBackupRecord *> *> *groups = [NSMutableDictionary new];
+    for (WQMBackupRecord *record in [self recordsInBackupRoot]) {
+        if (WQMStorageReasonIsSafetyBackup(record.reason)) continue;
+        NSString *key = [NSString stringWithFormat:@"%@|%@",
+                         record.bundleIdentifier ?: @"", record.scopeCode ?: @""];
+        NSMutableArray *group = groups[key];
+        if (!group) {
+            group = [NSMutableArray new];
+            groups[key] = group;
+        }
+        [group addObject:record];
+    }
+
+    NSUInteger removed = 0;
+    unsigned long long freed = 0;
+    for (NSMutableArray<WQMBackupRecord *> *group in groups.allValues) {
+        [group sortUsingComparator:^NSComparisonResult(WQMBackupRecord *a, WQMBackupRecord *b) {
+            return [b.createdAt compare:a.createdAt];
+        }];
+        for (NSUInteger index = keep; index < group.count; index++) {
+            WQMBackupRecord *record = group[index];
+            if ([protected containsObject:record.path.stringByStandardizingPath]) continue;
+            freed += WQMAppsSupportTreeSize(record.path);
+            if ([fm removeItemAtPath:record.path error:nil]) removed += 1;
+        }
+    }
+    if (deletedBytes) *deletedBytes = freed;
+    return removed;
+}
+
 @end

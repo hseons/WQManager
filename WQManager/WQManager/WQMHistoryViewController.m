@@ -48,6 +48,61 @@ static NSString *WQMHistoryLocalizedMessage(NSString *message)
     return key ? WQML(key, message) : message;
 }
 
+static UIColor *WQMHistoryStatusTint(WQMOperationStatus status)
+{
+    switch (status) {
+        case WQMOperationStatusSuccess: return WQMTheme.highlightColor;
+        case WQMOperationStatusFailure: return WQMTheme.dangerColor;
+        case WQMOperationStatusRolledBack:
+        case WQMOperationStatusInterrupted: return UIColor.systemOrangeColor;
+        case WQMOperationStatusCancelled:
+        case WQMOperationStatusRunning:
+        default: return WQMTheme.textSecondaryColor;
+    }
+}
+
+@interface WQMStatusBadgeView : UIView
+- (void)configureWithText:(NSString *)text tint:(UIColor *)tint;
+@end
+
+@implementation WQMStatusBadgeView {
+    UILabel *_label;
+}
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        self.translatesAutoresizingMaskIntoConstraints = NO;
+        self.layer.cornerCurve = kCACornerCurveContinuous;
+        self.layer.cornerRadius = 7;
+        self.clipsToBounds = YES;
+        _label = [UILabel new];
+        _label.translatesAutoresizingMaskIntoConstraints = NO;
+        _label.font = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleCaption2]
+                       scaledFontForFont:[UIFont systemFontOfSize:11 weight:UIFontWeightSemibold]];
+        _label.adjustsFontForContentSizeCategory = YES;
+        _label.textAlignment = NSTextAlignmentCenter;
+        [self addSubview:_label];
+        [NSLayoutConstraint activateConstraints:@[
+            [_label.topAnchor constraintEqualToAnchor:self.topAnchor constant:3],
+            [_label.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-3],
+            [_label.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:8],
+            [_label.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-8],
+        ]];
+    }
+    return self;
+}
+
+- (void)configureWithText:(NSString *)text tint:(UIColor *)tint
+{
+    _label.text = text;
+    _label.textColor = tint;
+    self.backgroundColor = [tint colorWithAlphaComponent:0.14];
+}
+
+@end
+
 typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     WQMHistoryFilterAll = 0,
     WQMHistoryFilterSuccess,
@@ -64,11 +119,15 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
                          bytes:(unsigned long long)bytes
                         latest:(NSDate *)latest
                       expanded:(BOOL)expanded;
+- (void)configureEmptyWithText:(NSString *)text detail:(NSString *)detail;
 @end
 
 @implementation WQMHistoryCell {
     UIImageView *_chevronView;
+    WQMStatusBadgeView *_statusBadge;
     NSLayoutConstraint *_cardWidthConstraint;
+    NSLayoutConstraint *_listTrailingToCardConstraint;
+    NSLayoutConstraint *_listTrailingToBadgeConstraint;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier
@@ -103,11 +162,20 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
             [UIImageSymbolConfiguration configurationWithPointSize:13
                                                             weight:UIImageSymbolWeightSemibold];
         [_cardView addSubview:_chevronView];
+
+        _statusBadge = [WQMStatusBadgeView new];
+        _statusBadge.hidden = YES;
+        [_cardView addSubview:_statusBadge];
         [self.contentView addSubview:_cardView];
 
         _cardWidthConstraint = [_cardView.widthAnchor constraintEqualToAnchor:self.contentView.widthAnchor
                                                                      constant:-24];
         _cardWidthConstraint.priority = 999;
+        _listTrailingToCardConstraint = [_listContentView.trailingAnchor
+            constraintEqualToAnchor:_cardView.trailingAnchor constant:-30];
+        _listTrailingToBadgeConstraint = [_listContentView.trailingAnchor
+            constraintEqualToAnchor:_statusBadge.leadingAnchor constant:-8];
+        _listTrailingToBadgeConstraint.active = NO;
         [NSLayoutConstraint activateConstraints:@[
             [_cardView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:5],
             [_cardView.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
@@ -116,13 +184,15 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
             [_cardView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-5],
             [_listContentView.topAnchor constraintEqualToAnchor:_cardView.topAnchor constant:9],
             [_listContentView.leadingAnchor constraintEqualToAnchor:_cardView.leadingAnchor constant:14],
-            [_listContentView.trailingAnchor constraintEqualToAnchor:_cardView.trailingAnchor constant:-30],
+            _listTrailingToCardConstraint,
             [_listContentView.bottomAnchor constraintEqualToAnchor:_cardView.bottomAnchor constant:-9],
             [_cardView.heightAnchor constraintGreaterThanOrEqualToConstant:64],
             [_chevronView.centerYAnchor constraintEqualToAnchor:_cardView.centerYAnchor],
             [_chevronView.trailingAnchor constraintEqualToAnchor:_cardView.trailingAnchor constant:-12],
             [_chevronView.widthAnchor constraintEqualToConstant:16],
             [_chevronView.heightAnchor constraintEqualToConstant:16],
+            [_statusBadge.centerYAnchor constraintEqualToAnchor:_cardView.centerYAnchor],
+            [_statusBadge.trailingAnchor constraintEqualToAnchor:_cardView.trailingAnchor constant:-12],
         ]];
     }
     return self;
@@ -131,6 +201,9 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
 - (void)configureWithOperation:(WQMOperationRecord *)operation indented:(BOOL)indented
 {
     _chevronView.hidden = YES;
+    _statusBadge.hidden = NO;
+    _listTrailingToCardConstraint.active = NO;
+    _listTrailingToBadgeConstraint.active = YES;
     _cardWidthConstraint.constant = indented ? -56 : -24;
     UIListContentConfiguration *configuration = (UIListContentConfiguration *)self.listContentView.configuration;
     NSString *kind = [WQMOperationRecord displayNameForKind:operation.kind];
@@ -143,18 +216,16 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     formatter.timeStyle = NSDateFormatterShortStyle;
     NSMutableArray<NSString *> *details = [NSMutableArray new];
     if (operation.scope.length) [details addObject:WQMHistoryLocalizedScope(operation.scope)];
+    [details addObject:[formatter stringFromDate:operation.startedAt]];
     if (operation.bytes > 0) {
         [details addObject:WQMFormatBytes(operation.bytes)];
     }
-    [details addObject:[formatter stringFromDate:operation.startedAt]];
-    [details addObject:status];
     configuration.secondaryText = [details componentsJoinedByString:@" · "];
 
     configuration.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
     configuration.textProperties.color = WQMTheme.textPrimaryColor;
     configuration.secondaryTextProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
-    configuration.secondaryTextProperties.color =
-        operation.status == WQMOperationStatusFailure ? WQMTheme.dangerColor : WQMTheme.textSecondaryColor;
+    configuration.secondaryTextProperties.color = WQMTheme.textSecondaryColor;
 
     NSString *symbol = @"clock";
     switch (operation.kind) {
@@ -175,7 +246,9 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     configuration.textProperties.font = [UIFont preferredFontForTextStyle:
         indented ? UIFontTextStyleSubheadline : UIFontTextStyleHeadline];
     self.listContentView.configuration = configuration;
-    self.accessibilityLabel = [NSString stringWithFormat:@"%@，%@", configuration.text, configuration.secondaryText];
+    [_statusBadge configureWithText:status tint:WQMHistoryStatusTint(operation.status)];
+    self.accessibilityLabel = [NSString stringWithFormat:@"%@，%@，%@",
+                               configuration.text, configuration.secondaryText, status];
 }
 
 - (void)configureWithGroupKind:(WQMOperationKind)kind
@@ -185,6 +258,10 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
                       expanded:(BOOL)expanded
 {
     _chevronView.hidden = NO;
+    _statusBadge.hidden = YES;
+    _listTrailingToBadgeConstraint.active = NO;
+    _listTrailingToCardConstraint.constant = -30;
+    _listTrailingToCardConstraint.active = YES;
     _cardWidthConstraint.constant = -24;
     UIListContentConfiguration *configuration = (UIListContentConfiguration *)self.listContentView.configuration;
     NSString *kindName = [WQMOperationRecord displayNameForKind:kind];
@@ -213,6 +290,29 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     self.accessibilityLabel = [NSString stringWithFormat:@"%@，%@", configuration.text, configuration.secondaryText];
 }
 
+- (void)configureEmptyWithText:(NSString *)text detail:(NSString *)detail
+{
+    _chevronView.hidden = YES;
+    _statusBadge.hidden = YES;
+    _listTrailingToBadgeConstraint.active = NO;
+    _listTrailingToCardConstraint.constant = -14;
+    _listTrailingToCardConstraint.active = YES;
+    _cardWidthConstraint.constant = -24;
+    UIListContentConfiguration *configuration = (UIListContentConfiguration *)self.listContentView.configuration;
+    configuration.text = text;
+    configuration.secondaryText = detail;
+    configuration.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    configuration.textProperties.color = WQMTheme.textPrimaryColor;
+    configuration.secondaryTextProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    configuration.secondaryTextProperties.color = WQMTheme.textSecondaryColor;
+    configuration.image = [UIImage systemImageNamed:@"clock.badge.questionmark"];
+    configuration.imageProperties.tintColor = WQMTheme.textSecondaryColor;
+    configuration.imageProperties.maximumSize = CGSizeMake(34, 34);
+    configuration.imageProperties.reservedLayoutSize = CGSizeMake(34, 34);
+    self.listContentView.configuration = configuration;
+    self.accessibilityLabel = [NSString stringWithFormat:@"%@，%@", text, detail];
+}
+
 @end
 
 @implementation WQMHistoryViewController {
@@ -225,6 +325,7 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     NSUInteger _loadGeneration;
     WQMConfirmationGate *_clearGate;
     NSMutableSet<NSString *> *_expandedKeys;
+    UIBarButtonItem *_moreItem;
 }
 
 - (instancetype)init
@@ -382,6 +483,11 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
             __strong typeof(weakSelf) self = weakSelf;
             [self collapseAllGroups];
         }],
+        [UIAction actionWithTitle:WQML(@"HISTORY_EXPORT", @"导出记录")
+                            image:[UIImage systemImageNamed:@"square.and.arrow.up"]
+                       identifier:nil handler:^(__unused UIAction *action) {
+            [weakSelf exportHistory];
+        }],
         [UIAction actionWithTitle:WQML(@"CLEAR_HISTORY", @"清空记录") image:[UIImage systemImageNamed:@"trash"]
                        identifier:nil handler:^(__unused UIAction *action) {
             [weakSelf confirmClearHistory];
@@ -389,7 +495,35 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     ]];
     moreButton.showsMenuAsPrimaryAction = YES;
     UIBarButtonItem *moreItem = [[UIBarButtonItem alloc] initWithCustomView:moreButton];
+    _moreItem = moreItem;
     self.navigationItem.rightBarButtonItems = @[moreItem, filterItem];
+}
+
+- (void)exportHistory
+{
+    if (!_operations.count) return;
+    NSDate *now = NSDate.date;
+    NSString *csv = [WQMOperationStore CSVExportForRecords:_operations];
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                      [WQMOperationStore CSVExportFileNameForDate:now]];
+    NSError *error = nil;
+    if (![csv writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&error]) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:WQML(@"HISTORY_EXPORT", @"导出记录")
+                                                                      message:WQML(@"HISTORY_EXPORT_FAILED", @"无法生成导出文件")
+                                                               preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"好")
+                                                  style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    NSURL *url = [NSURL fileURLWithPath:path];
+    UIActivityViewController *activity = [[UIActivityViewController alloc] initWithActivityItems:@[url]
+                                                                          applicationActivities:nil];
+    UIPopoverPresentationController *popover = activity.popoverPresentationController;
+    if (popover) {
+        popover.barButtonItem = _moreItem;
+    }
+    [self presentViewController:activity animated:YES completion:nil];
 }
 
 - (void)searchControlTouched
@@ -612,16 +746,12 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
         cell = [[WQMHistoryCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"history"];
     }
     if (!_sections.count) {
-        UIListContentConfiguration *configuration = (UIListContentConfiguration *)cell.listContentView.configuration;
-        configuration.text = _operations.count
+        [cell configureEmptyWithText:(_operations.count
             ? WQML(@"HISTORY_NO_MATCH", @"没有符合筛选的记录")
-            : WQML(@"HISTORY_EMPTY", @"还没有操作记录");
-        configuration.secondaryText = _operations.count
+            : WQML(@"HISTORY_EMPTY", @"还没有操作记录"))
+                              detail:(_operations.count
             ? WQML(@"HISTORY_ADJUST_FILTER", @"调整搜索或筛选条件")
-            : WQML(@"HISTORY_EMPTY_DETAIL", @"备份和恢复操作会显示在这里");
-        configuration.image = [UIImage systemImageNamed:@"clock.badge.questionmark"];
-        configuration.imageProperties.tintColor = WQMTheme.textSecondaryColor;
-        cell.listContentView.configuration = configuration;
+            : WQML(@"HISTORY_EMPTY_DETAIL", @"备份和恢复操作会显示在这里"))];
         return cell;
     }
     NSDictionary *section = _sections[(NSUInteger)indexPath.section];

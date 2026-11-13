@@ -122,6 +122,22 @@ static NSArray<NSString *> *WQMCanonicalParts(NSArray<NSString *> *parts)
 
 @end
 
+@implementation WQMBackupGroup
+
+- (unsigned long long)totalBytes
+{
+    unsigned long long total = 0;
+    for (WQMBackupRecord *record in self.backups) total += record.totalBytes;
+    return total;
+}
+
+- (NSDate *)latestAt
+{
+    return self.backups.firstObject.createdAt ?: NSDate.distantPast;
+}
+
+@end
+
 @implementation WQMBackupStore
 
 + (NSString *)backupRoot
@@ -160,5 +176,40 @@ static NSArray<NSString *> *WQMCanonicalParts(NSArray<NSString *> *parts)
     return records;
 }
 
-@end
 
++ (NSArray<WQMBackupGroup *> *)groupsForRecords:(NSArray<WQMBackupRecord *> *)records
+{
+    NSMutableDictionary<NSString *, NSMutableArray<WQMBackupRecord *> *> *grouped = [NSMutableDictionary new];
+    NSMutableArray<NSString *> *order = [NSMutableArray new];
+    for (WQMBackupRecord *record in records) {
+        NSString *key = record.bundleIdentifier.length ? record.bundleIdentifier : record.displayName ?: @"";
+        NSMutableArray *bucket = grouped[key];
+        if (!bucket) {
+            bucket = [NSMutableArray new];
+            grouped[key] = bucket;
+            [order addObject:key];
+        }
+        [bucket addObject:record];
+    }
+
+    NSMutableArray<WQMBackupGroup *> *groups = [NSMutableArray arrayWithCapacity:order.count];
+    for (NSString *key in order) {
+        NSArray<WQMBackupRecord *> *bucket = grouped[key];
+        NSArray<WQMBackupRecord *> *sorted = [bucket sortedArrayUsingComparator:
+            ^NSComparisonResult(WQMBackupRecord *a, WQMBackupRecord *b) {
+                return [b.createdAt compare:a.createdAt];
+            }];
+        WQMBackupGroup *group = [WQMBackupGroup new];
+        group.bundleIdentifier = key;
+        WQMBackupRecord *newest = sorted.firstObject;
+        group.displayName = newest.displayName.length ? newest.displayName : key;
+        group.backups = sorted;
+        [groups addObject:group];
+    }
+    [groups sortUsingComparator:^NSComparisonResult(WQMBackupGroup *a, WQMBackupGroup *b) {
+        return [b.latestAt compare:a.latestAt];
+    }];
+    return groups;
+}
+
+@end

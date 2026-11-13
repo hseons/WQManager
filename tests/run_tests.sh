@@ -109,3 +109,75 @@ clang \
   -o "$OUTPUT_DIR/WQMStorageServiceTests"
 
 "$OUTPUT_DIR/WQMStorageServiceTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  "$SOURCE_DIR/WQMLanguageManager.m" \
+  "$SOURCE_DIR/WQMOperationStore.m" \
+  "$ROOT/tests/WQMHistoryExportTests.m" \
+  -o "$OUTPUT_DIR/WQMHistoryExportTests"
+
+"$OUTPUT_DIR/WQMHistoryExportTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  "$SOURCE_DIR/WQMLanguageManager.m" \
+  "$SOURCE_DIR/WQMAppModel.m" \
+  "$ROOT/tests/WQMAppSortTests.m" \
+  -o "$OUTPUT_DIR/WQMAppSortTests"
+
+"$OUTPUT_DIR/WQMAppSortTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  -framework CoreFoundation \
+  "$SOURCE_DIR/WQMLanguageManager.m" \
+  "$SOURCE_DIR/WQMAppModel.m" \
+  "$ROOT/tests/WQMSearchTests.m" \
+  -o "$OUTPUT_DIR/WQMSearchTests"
+
+"$OUTPUT_DIR/WQMSearchTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  -framework CoreGraphics \
+  "$SOURCE_DIR/WQMBubbleLayout.m" \
+  "$ROOT/tests/WQMBubbleLayoutTests.m" \
+  -o "$OUTPUT_DIR/WQMBubbleLayoutTests"
+
+"$OUTPUT_DIR/WQMBubbleLayoutTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  "$SOURCE_DIR/WQMTrashStore.m" \
+  "$SOURCE_DIR/WQMSharedInbox.m" \
+  "$ROOT/tests/WQMTrashStoreTests.m" \
+  -o "$OUTPUT_DIR/WQMTrashStoreTests"
+
+"$OUTPUT_DIR/WQMTrashStoreTests"
+
+clang \
+  -fobjc-arc \
+  -fblocks \
+  -I"$SOURCE_DIR" \
+  -framework Foundation \
+  "$SOURCE_DIR/WQMFilePreviewModel.m" \
+  "$ROOT/tests/WQMFilePreviewTests.m" \
+  -o "$OUTPUT_DIR/WQMFilePreviewTests"
+
+"$OUTPUT_DIR/WQMFilePreviewTests"

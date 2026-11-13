@@ -14,6 +14,7 @@ typedef NS_ENUM(NSInteger, WQMOperationKind) {
     WQMOperationKindImport,
     WQMOperationKindDeleteBackup,
     WQMOperationKindCleanCache,
+    WQMOperationKindDeleteFiles,
 };
 
 typedef NS_ENUM(NSInteger, WQMOperationStatus) {
@@ -56,6 +57,12 @@ typedef NS_ENUM(NSInteger, WQMOperationStatus) {
 + (void)updateRecord:(WQMOperationRecord *)record;
 + (NSArray<WQMOperationRecord *> *)allOperations;
 + (void)clear;
+
+/// Comma separated export of the given records, UTF-8 with a byte order mark so
+/// spreadsheet apps on both macOS and Windows open the Chinese columns directly.
++ (NSString *)CSVExportForRecords:(NSArray<WQMOperationRecord *> *)records;
+/// Suggested file name for an export taken at `date`, e.g. WQManager-history-20261113-104100.csv
++ (NSString *)CSVExportFileNameForDate:(NSDate *)date;
 
 + (void)setStorageRootForTesting:(nullable NSString *)root;
 

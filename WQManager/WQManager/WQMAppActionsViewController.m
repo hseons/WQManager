@@ -75,6 +75,11 @@
                                              symbol:@"arrow.triangle.2.circlepath"
                                             primary:NO
                                              action:WQMAppActionRestore];
+    UIButton *space = [self actionButtonWithTitle:WQML(@"LENS_TITLE", @"空间透镜")
+                                         subtitle:WQML(@"LENS_SUB", @"查看容器里谁占空间")
+                                           symbol:@"circle.grid.2x2"
+                                          primary:NO
+                                           action:WQMAppActionInspectSpace];
     UIButton *copy = [self actionButtonWithTitle:WQML(@"COPY_BUNDLE", @"复制 Bundle ID")
                                         subtitle:_app.bundleIdentifier
                                           symbol:@"doc.on.doc"
@@ -82,7 +87,7 @@
                                           action:WQMAppActionCopyBundleID];
 
     UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[
-        header, quick, full, restore, copy
+        header, quick, full, restore, space, copy
     ]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.spacing = 10;
@@ -98,6 +103,7 @@
         [quick.heightAnchor constraintGreaterThanOrEqualToConstant:60],
         [full.heightAnchor constraintGreaterThanOrEqualToConstant:60],
         [restore.heightAnchor constraintGreaterThanOrEqualToConstant:60],
+        [space.heightAnchor constraintGreaterThanOrEqualToConstant:60],
         [copy.heightAnchor constraintGreaterThanOrEqualToConstant:56],
     ]];
     [WQMTheme animateEntrance:stack delay:0.02];

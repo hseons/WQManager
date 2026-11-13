@@ -10,6 +10,34 @@ static void WQMAssert(BOOL condition, NSString *message)
     fprintf(stderr, "FAIL: %s\n", message.UTF8String);
 }
 
+static NSString *WQMWriteBackup(NSString *root, NSString *bundleID, NSDate *created,
+                                unsigned long long totalBytes, NSString *directory)
+{
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *path = [[root stringByAppendingPathComponent:bundleID]
+                      stringByAppendingPathComponent:directory];
+    NSString *documents = [path stringByAppendingPathComponent:@"Documents"];
+    [fm createDirectoryAtPath:documents withIntermediateDirectories:YES attributes:nil error:nil];
+    [@"x" writeToFile:[documents stringByAppendingPathComponent:@"note.txt"]
+           atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    NSDictionary *manifest = @{
+        @"Complete": @YES,
+        @"Format": @2,
+        @"BundleID": bundleID,
+        @"DisplayName": [bundleID componentsSeparatedByString:@"."].firstObject,
+        @"Scope": @"快速备份",
+        @"ScopeCode": @"quick",
+        @"Reason": @"test",
+        @"Created": created,
+        @"Parts": @[@"Documents"],
+        @"PartHashes": @{@"Documents": @"abc123"},
+        @"TotalBytes": @(totalBytes),
+        @"SystemVersion": @"26.0",
+    };
+    [manifest writeToFile:[path stringByAppendingPathComponent:@"manifest.plist"] atomically:YES];
+    return path;
+}
+
 int main(void)
 {
     @autoreleasepool {
@@ -55,6 +83,33 @@ int main(void)
         WQMAssert([WQMBackupRecord recordAtPath:backup error:&error] == nil,
                   @"unexpected contents must invalidate a backup");
         [fm removeItemAtPath:root error:nil];
+
+        // Grouping keeps backups of one app together, newest first.
+        NSString *groupRoot = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
+        [WQMBackupStore setBackupRootForTesting:groupRoot];
+        NSDate *now = [NSDate dateWithTimeIntervalSince1970:1763000000];
+        NSString *older = WQMWriteBackup(groupRoot, @"com.example.app",
+                                         [now dateByAddingTimeInterval:-3600], 10, @"a");
+        NSString *newer = WQMWriteBackup(groupRoot, @"com.example.app", now, 20, @"b");
+        NSString *other = WQMWriteBackup(groupRoot, @"com.other.app",
+                                         [now dateByAddingTimeInterval:-60], 5, @"c");
+        (void)older; (void)newer; (void)other;
+
+        NSArray<WQMBackupGroup *> *groups = [WQMBackupStore groupsForRecords:[WQMBackupStore allBackups]];
+        WQMAssert(groups.count == 2, @"two apps should produce two groups");
+        if (groups.count == 2) {
+            WQMAssert([groups[0].bundleIdentifier isEqualToString:@"com.example.app"],
+                      @"the group with the newest backup comes first");
+            WQMAssert(groups[0].backups.count == 2, @"app group should contain both backups");
+            WQMAssert(groups[0].totalBytes == 30, @"group size should add up its backups");
+            WQMAssert([groups[0].backups[0].createdAt compare:groups[0].backups[1].createdAt] == NSOrderedDescending,
+                      @"backups inside a group are newest first");
+            WQMAssert([groups[1].bundleIdentifier isEqualToString:@"com.other.app"],
+                      @"the remaining app keeps its own group");
+        }
+        WQMAssert([WQMBackupStore groupsForRecords:@[]].count == 0, @"no records means no groups");
+        [WQMBackupStore setBackupRootForTesting:nil];
+        [fm removeItemAtPath:groupRoot error:nil];
     }
 
     if (gFailures) {

@@ -2227,6 +2227,103 @@ WQMeasureResult wq_measure_tree(NSString *dir, WQScanCancellation *cancellation,
     return wq_measure_tree_budgeted(dir, cancellation, bytes, unlimited);
 }
 
+NSString *const WQChildNameKey = @"name";
+NSString *const WQChildPathKey = @"path";
+NSString *const WQChildIsDirectoryKey = @"isDirectory";
+NSString *const WQChildBytesKey = @"bytes";
+NSString *const WQChildLimitedKey = @"limited";
+
+NSArray<NSDictionary<NSString *, id> *> *wq_measure_children(NSString *dir, WQScanCancellation *cancellation,
+                                                            WQMeasureBudget budget, WQMeasureResult *result)
+{
+    if (result) *result = WQMeasureResultMissing;
+    if (cancellation.isCancelled) {
+        if (result) *result = WQMeasureResultCancelled;
+        return nil;
+    }
+    struct stat root = {0};
+    if (!wq_stat(dir, &root)) {
+        BOOL missing = lstat(dir.fileSystemRepresentation, &root) != 0 &&
+                       (errno == ENOENT || errno == ENOTDIR);
+        if (result) *result = missing ? WQMeasureResultMissing : WQMeasureResultLimited;
+        return nil;
+    }
+    if (!S_ISDIR(root.st_mode)) {
+        wq_log(@"measure children %@: not a directory", dir);
+        if (result) *result = WQMeasureResultLimited;
+        return nil;
+    }
+    NSString *errorText = nil;
+    NSArray<NSString *> *names = wq_list(dir, &errorText);
+    if (!names) {
+        wq_log(@"measure children %@: cannot list (%@)", dir, errorText ?: @"unknown error");
+        if (result) *result = WQMeasureResultLimited;
+        return nil;
+    }
+
+    CFAbsoluteTime started = CFAbsoluteTimeGetCurrent();
+    BOOL limited = NO;
+    BOOL budgetHit = NO;
+    NSMutableArray<NSDictionary<NSString *, id> *> *entries =
+        [NSMutableArray arrayWithCapacity:names.count];
+    for (NSString *name in names) {
+        if (cancellation.isCancelled) {
+            if (result) *result = WQMeasureResultCancelled;
+            return nil;
+        }
+        if (name.length == 0) continue;
+        NSString *path = [dir stringByAppendingPathComponent:name];
+        struct stat child = {0};
+        if (!wq_stat(path, &child)) {
+            limited = YES;
+            continue;
+        }
+        BOOL isDirectory = S_ISDIR(child.st_mode) != 0;
+        unsigned long long bytes = 0;
+        BOOL childLimited = NO;
+        if (isDirectory) {
+            WQMeasureBudget remaining = budget;
+            if (budget.maxSeconds > 0) {
+                double left = budget.maxSeconds - (CFAbsoluteTimeGetCurrent() - started);
+                if (left <= 0) { budgetHit = YES; break; }
+                remaining.maxSeconds = left;
+            }
+            WQMeasureResult sub = wq_measure_tree_budgeted(path, cancellation, &bytes, remaining);
+            if (sub == WQMeasureResultCancelled) {
+                if (result) *result = WQMeasureResultCancelled;
+                return nil;
+            }
+            if (sub == WQMeasureResultBudgetExceeded) budgetHit = YES;
+            if (sub != WQMeasureResultKnown) childLimited = YES;
+        } else if (S_ISREG(child.st_mode)) {
+            bytes = (unsigned long long)child.st_size;
+        } else {
+            continue;  // links, sockets, pipes: not user-visible space
+        }
+        [entries addObject:@{
+            WQChildNameKey: name,
+            WQChildPathKey: path,
+            WQChildIsDirectoryKey: @(isDirectory),
+            WQChildBytesKey: @(bytes),
+            WQChildLimitedKey: @(childLimited),
+        }];
+        if (childLimited) limited = YES;
+    }
+
+    [entries sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        unsigned long long left = [a[WQChildBytesKey] unsignedLongLongValue];
+        unsigned long long right = [b[WQChildBytesKey] unsignedLongLongValue];
+        if (left != right) return left > right ? NSOrderedAscending : NSOrderedDescending;
+        return [a[WQChildNameKey] localizedStandardCompare:b[WQChildNameKey]];
+    }];
+    if (result) {
+        *result = budgetHit ? WQMeasureResultBudgetExceeded
+                            : (limited ? WQMeasureResultLimited : WQMeasureResultKnown);
+    }
+    return entries;
+}
+
+
 static BOOL wq_directory_current(NSString *path, int fd)
 {
     int current = WQOpenDirectoryNoLinksFlags(path, O_SEARCH);

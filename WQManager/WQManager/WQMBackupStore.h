@@ -28,11 +28,27 @@ extern NSNotificationName const WQMBackupStoreDidChangeNotification;
 
 @end
 
+/// Every backup of one app, newest first. The backup screen lists one section
+/// per group so several backups of the same app stay together.
+@interface WQMBackupGroup : NSObject
+
+@property (nonatomic, copy) NSString *bundleIdentifier;
+@property (nonatomic, copy) NSString *displayName;
+@property (nonatomic, copy) NSArray<WQMBackupRecord *> *backups;
+@property (nonatomic, readonly) unsigned long long totalBytes;
+@property (nonatomic, readonly) NSDate *latestAt;
+
+@end
+
 @interface WQMBackupStore : NSObject
 
 + (NSString *)backupRoot;
 + (NSArray<WQMBackupRecord *> *)allBackups;
 + (void)setBackupRootForTesting:(nullable NSString *)root;
+
+/// Groups records by Bundle ID, keeping each group's records newest first and
+/// ordering the groups by their most recent backup.
++ (NSArray<WQMBackupGroup *> *)groupsForRecords:(NSArray<WQMBackupRecord *> *)records;
 
 @end
 

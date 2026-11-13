@@ -8,6 +8,7 @@ typedef NS_ENUM(NSInteger, WQMAppAction) {
     WQMAppActionQuickBackup = 0,
     WQMAppActionFullBackup,
     WQMAppActionRestore,
+    WQMAppActionInspectSpace,
     WQMAppActionCopyBundleID,
 };
 

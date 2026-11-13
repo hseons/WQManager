@@ -134,6 +134,44 @@ int main(void)
         WQMAssert(removed == 0, @"protected safety backup should not be removed");
         WQMAssert([fm fileExistsAtPath:safetyProtected], @"protected safety backup should survive");
 
+        // Retention keeps only the newest backups of one app and scope.
+        NSString *retentionBundle = @"com.retention.app";
+        NSMutableArray<NSString *> *retentionPaths = [NSMutableArray new];
+        for (NSUInteger index = 0; index < 4; index++) {
+            [retentionPaths addObject:WQMMakeBackup(backupRoot, retentionBundle,
+                                                    [NSString stringWithFormat:@"2026020%lu-000000", (unsigned long)index + 1],
+                                                    @"manual",
+                                                    [NSDate dateWithTimeIntervalSince1970:3000 + index],
+                                                    1024 * (index + 1))];
+        }
+        NSString *retentionSafety = WQMMakeBackup(backupRoot, retentionBundle, @"20260101-000000",
+                                                   @"恢复前自动安全备份",
+                                                   [NSDate dateWithTimeIntervalSince1970:100], 512);
+
+        deleted = 0;
+        removed = [WQMStorageService pruneBackupsKeeping:2 excluding:[NSSet set] deletedBytes:&deleted];
+        WQMAssert(removed == 2, @"retention should remove the two oldest backups");
+        WQMAssert(deleted > 0, @"retention should report deleted bytes");
+        WQMAssert(![fm fileExistsAtPath:retentionPaths[0]], @"oldest backup should be removed");
+        WQMAssert(![fm fileExistsAtPath:retentionPaths[1]], @"second oldest backup should be removed");
+        WQMAssert([fm fileExistsAtPath:retentionPaths[2]], @"newest two backups should stay");
+        WQMAssert([fm fileExistsAtPath:retentionPaths[3]], @"newest backup should stay");
+        WQMAssert([fm fileExistsAtPath:retentionSafety], @"safety backup is never pruned by retention");
+
+        NSString *retentionProtected = WQMMakeBackup(backupRoot, @"com.protected.app", @"20260101-000000",
+                                                      @"manual", [NSDate dateWithTimeIntervalSince1970:10], 256);
+        NSString *retentionFresh = WQMMakeBackup(backupRoot, @"com.protected.app", @"20260102-000000",
+                                                  @"manual", [NSDate dateWithTimeIntervalSince1970:20], 256);
+        removed = [WQMStorageService pruneBackupsKeeping:2
+                                               excluding:[NSSet setWithObject:retentionProtected]
+                                            deletedBytes:NULL];
+        WQMAssert(removed == 0, @"protected backups survive retention");
+        WQMAssert([fm fileExistsAtPath:retentionProtected], @"protected backup file should still exist");
+        WQMAssert([fm fileExistsAtPath:retentionFresh], @"newest protected-group backup should stay");
+
+        WQMAssert([WQMStorageService pruneBackupsKeeping:0 excluding:[NSSet set] deletedBytes:NULL] == 0,
+                  @"keeping zero means no retention is applied");
+
         cleaned = [WQMStorageService cleanupWithOptions:WQMStorageCleanupTemporary
                                                excluding:[NSSet set]
                                               freedBytes:NULL error:NULL];

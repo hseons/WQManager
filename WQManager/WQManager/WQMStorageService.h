@@ -47,6 +47,13 @@ typedef NS_OPTIONS(NSUInteger, WQMStorageCleanupOptions) {
                               excluding:(NSSet<NSString *> *)protectedPaths
                             deletedBytes:(nullable unsigned long long *)deletedBytes;
 
+/// Keeps the newest `keep` backups per app and scope and deletes the rest.
+/// Automatic safety backups are skipped: they have their own pruning rule.
+/// Returns the number of removed backups.
++ (NSUInteger)pruneBackupsKeeping:(NSUInteger)keep
+                        excluding:(NSSet<NSString *> *)protectedPaths
+                     deletedBytes:(nullable unsigned long long *)deletedBytes;
+
 + (void)setRootsForTesting:(nullable NSString *)backupRoot
              temporaryRoot:(nullable NSString *)temporaryRoot;
 

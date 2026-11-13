@@ -14,6 +14,10 @@
 #import "WQMTheme.h"
 #import "WQMHousekeeping.h"
 #import "WQMStorageViewController.h"
+#import "WQMPreferences.h"
+#import "WQMRestoreService.h"
+#import "WQMStorageService.h"
+#import "WQMBackupStore.h"
 #if DEBUG
 #import "WQMLongOperationBanner.h"
 #endif
@@ -29,11 +33,36 @@
 @implementation SceneDelegate
 
 
+- (void)applyBackupRetentionPolicy
+{
+    NSInteger limit = WQMBackupRetentionLimit();
+    if (limit <= 0) return;
+    NSSet<NSString *> *protectedPaths = [NSSet setWithArray:[WQMRestoreService pendingRecoveryBackupPaths]];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSUInteger removed = [WQMStorageService pruneBackupsKeeping:(NSUInteger)limit
+                                                         excluding:protectedPaths
+                                                      deletedBytes:NULL];
+        if (!removed) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [NSNotificationCenter.defaultCenter postNotificationName:WQMBackupStoreDidChangeNotification
+                                                             object:nil];
+        });
+    });
+}
+
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
     if (![scene isKindOfClass:UIWindowScene.class]) return;
 
     UIWindow *window = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
     self.window = window;
+#if DEBUG
+    NSString *appearance = NSProcessInfo.processInfo.environment[@"WQM_UI_APPEARANCE"];
+    if ([appearance isEqualToString:@"light"]) {
+        window.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
+    } else if ([appearance isEqualToString:@"dark"]) {
+        window.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    }
+#endif
     [NSNotificationCenter.defaultCenter addObserver:self
                                            selector:@selector(languageDidChange:)
                                                name:WQMLanguageDidChangeNotification
@@ -41,6 +70,7 @@
     [self showLegalGateIfNeeded];
     [window makeKeyAndVisible];
     [WQMHousekeeping runAtLaunch];
+    [self applyBackupRetentionPolicy];
 #if DEBUG
     if (getenv("WQM_UI_STORAGE")) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),

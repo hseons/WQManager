@@ -150,6 +150,22 @@ WQMeasureResult wq_measure_tree(NSString *dir, WQScanCancellation *_Nullable can
 WQMeasureResult wq_measure_tree_budgeted(NSString *dir, WQScanCancellation *_Nullable cancellation,
                                          unsigned long long *_Nullable bytes, WQMeasureBudget budget);
 
+// Keys of the dictionaries wq_measure_children returns.
+extern NSString *const WQChildNameKey;       // NSString, the item's own name
+extern NSString *const WQChildPathKey;       // NSString, absolute path
+extern NSString *const WQChildIsDirectoryKey;// NSNumber (BOOL)
+extern NSString *const WQChildBytesKey;      // NSNumber (unsigned long long)
+extern NSString *const WQChildLimitedKey;    // NSNumber (BOOL): some part was unreadable
+
+// Sizes the direct children of dir (a file: its own size; a folder: its whole
+// subtree), largest first. Symbolic links and special files are skipped.
+// Returns nil when dir cannot be listed; *result then says why (Missing,
+// Limited, Cancelled). The budget is shared by every child, so a deep first
+// child can use it up; *result is BudgetExceeded with the partial list then.
+NSArray<NSDictionary<NSString *, id> *> *_Nullable wq_measure_children(
+    NSString *dir, WQScanCancellation *_Nullable cancellation,
+    WQMeasureBudget budget, WQMeasureResult *_Nullable result);
+
 // Deletes every item *inside* dir (dir itself stays). No backup — for caches.
 // Adds freed bytes to *freed. A missing dir counts as done; NO if dir cannot
 // be read or listed, ancestry contains links (except canonical /var), the target

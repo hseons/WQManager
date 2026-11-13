@@ -6,6 +6,7 @@
 //
 
 #import "AppDelegate.h"
+#import "WQMBackupStore.h"
 #import "WQMOperationStore.h"
 
 @interface AppDelegate ()
@@ -39,10 +40,56 @@
             [WQMOperationStore updateRecord:record];
         }
     }
+    if ([NSProcessInfo.processInfo.environment[@"WQM_UI_FIXTURES"] boolValue] &&
+        [WQMBackupStore allBackups].count == 0) {
+        [self seedBackupFixtures];
+    }
 #endif
     return YES;
 }
 
+
+#if DEBUG
+- (void)seedBackupFixtures
+{
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *root = [WQMBackupStore backupRoot];
+    NSDate *now = NSDate.date;
+    NSArray<NSArray *> *fixtures = @[
+        @[@"微信", @"com.tencent.xin", @"快速备份", @"quick", @(6442450944ULL), @0, @(-2)],
+        @[@"微信", @"com.tencent.xin", @"完整备份", @"full", @(12884901888ULL), @1, @(-26)],
+        @[@"剪映", @"com.lemon.lv", @"快速备份", @"quick", @(4939212390ULL), @2, @(-50)],
+        @[@"抖音", @"com.ss.iphone.ugc.Aweme", @"恢复前自动安全备份", @"safety", @(3758096384ULL), @3, @(-74)],
+    ];
+    for (NSArray *fixture in fixtures) {
+        NSDateFormatter *formatter = [NSDateFormatter new];
+        formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        formatter.dateFormat = @"yyyyMMdd-HHmmss";
+        NSDate *created = [now dateByAddingTimeInterval:[fixture[6] doubleValue] * 3600];
+        NSString *directory = [[root stringByAppendingPathComponent:fixture[1]]
+                               stringByAppendingPathComponent:[formatter stringFromDate:created]];
+        NSString *documents = [directory stringByAppendingPathComponent:@"Documents"];
+        [fm createDirectoryAtPath:documents withIntermediateDirectories:YES attributes:nil error:nil];
+        [@"fixture" writeToFile:[documents stringByAppendingPathComponent:@"note.txt"]
+                     atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        NSDictionary *manifest = @{
+            @"Complete": @YES,
+            @"Format": @2,
+            @"BundleID": fixture[1],
+            @"DisplayName": fixture[0],
+            @"Scope": fixture[2],
+            @"ScopeCode": fixture[3],
+            @"Reason": fixture[2],
+            @"Created": created,
+            @"Parts": @[@"Documents"],
+            @"PartHashes": @{@"Documents": @"fixture"},
+            @"TotalBytes": fixture[4],
+            @"SystemVersion": @"26.0",
+        };
+        [manifest writeToFile:[directory stringByAppendingPathComponent:@"manifest.plist"] atomically:YES];
+    }
+}
+#endif
 
 #pragma mark - UISceneSession lifecycle
 

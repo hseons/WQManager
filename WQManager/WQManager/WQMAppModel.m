@@ -1,6 +1,12 @@
 #import "WQMAppModel.h"
 #import "WQMLanguageManager.h"
 #import <sys/stat.h>
+#import <CoreFoundation/CoreFoundation.h>
+
+@interface WQMAppModel () {
+    NSString *_searchInitials;
+}
+@end
 
 @implementation WQMAppModel
 
@@ -24,6 +30,28 @@
     return self;
 }
 
++ (NSString *)searchInitialsForName:(NSString *)name
+{
+    if (!name.length) return @"";
+    NSMutableString *latin = [name mutableCopy];
+    CFStringTransform((__bridge CFMutableStringRef)latin, NULL, kCFStringTransformMandarinLatin, NO);
+    CFStringTransform((__bridge CFMutableStringRef)latin, NULL, kCFStringTransformStripDiacritics, NO);
+    NSMutableString *initials = [NSMutableString string];
+    for (NSString *token in [latin componentsSeparatedByString:@" "]) {
+        if (!token.length) continue;
+        [initials appendString:[[token substringToIndex:1] lowercaseString]];
+    }
+    return initials;
+}
+
+- (NSString *)searchInitials
+{
+    if (!_searchInitials) {
+        _searchInitials = [WQMAppModel searchInitialsForName:self.displayName];
+    }
+    return _searchInitials;
+}
+
 - (NSString *)formattedSize
 {
     if (!self.sizeKnown) return WQML(@"SIZE_UNKNOWN", @"大小未知");
@@ -44,6 +72,24 @@
                 self.formattedSize];
     }
     return [NSString stringWithFormat:@"%@ · %@", self.formattedSize, self.bundleIdentifier];
+}
+
++ (NSArray<WQMAppModel *> *)apps:(NSArray<WQMAppModel *> *)apps sortedByOrder:(WQMAppSortOrder)order
+{
+    if (order == WQMAppSortOrderDefault || apps.count < 2) return apps;
+    return [apps sortedArrayUsingComparator:^NSComparisonResult(WQMAppModel *lhs, WQMAppModel *rhs) {
+        if (order == WQMAppSortOrderSizeDescending) {
+            if (lhs.sizeKnown != rhs.sizeKnown) {
+                return lhs.sizeKnown ? NSOrderedAscending : NSOrderedDescending;
+            }
+            if (lhs.dataSize != rhs.dataSize) {
+                return lhs.dataSize > rhs.dataSize ? NSOrderedAscending : NSOrderedDescending;
+            }
+        }
+        NSComparisonResult byName = [(lhs.displayName ?: @"") localizedStandardCompare:(rhs.displayName ?: @"")];
+        if (byName != NSOrderedSame) return byName;
+        return [(lhs.bundleIdentifier ?: @"") localizedStandardCompare:(rhs.bundleIdentifier ?: @"")];
+    }];
 }
 
 @end

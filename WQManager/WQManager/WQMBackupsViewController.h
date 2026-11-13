@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface WQMBackupsViewController : UITableViewController <UIDocumentPickerDelegate>
+@interface WQMBackupsViewController : UITableViewController <UIDocumentPickerDelegate, UISearchBarDelegate>
 - (void)importBackupAtURL:(NSURL *)url;
 - (void)presentImportPicker;
 @end

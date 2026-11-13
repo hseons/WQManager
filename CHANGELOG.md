@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.3.2] — 2026-11-13
+
+### Added
+
+- Apps: filter by size (large / medium / small / unknown) and by source (system /
+  third-party), sort by scan order, name, or size. Filters and sort survive a
+  relaunch, every menu checks the active option, and a search or filter with no
+  match gets its own empty state.
+- Apps and Backups: search also matches pinyin initials, so `wx` finds 微信 and
+  `zp` finds 照片.
+- Backups: grouped per app (newest group first) with per-group totals and a
+  search field. An optional retention policy (keep all / 1 / 3 / 5 / 10 per app
+  and scope) runs at launch and on demand, never touches automatic safety
+  backups, and reports how many old backups it removed.
+- History: export every record as CSV, and show each status as a badge on the
+  trailing edge of the row.
+- Space Lens: browse an app container one level at a time as a bubble map whose
+  area follows size. Drill into folder bubbles, tap a file bubble for a preview,
+  jump anywhere through the breadcrumb, and switch to a precise list.
+- Space Lens: bubbles are transparent rings of light with a type icon — folders,
+  databases, videos, images, archives, documents — and the tint follows the
+  interface style.
+- Space Lens: select several items to export or delete, swipe a list row to
+  delete one, or long-press a bubble for preview, share, copy path or delete.
+  Deletions ask for scope acknowledgement, land in a bin, and are recorded.
+- Space Lens: a file preview — pinch-zoom images, pretty-printed JSON,
+  monospaced text up to 2 MB, inline video and audio, and a 4 KB hex dump for
+  everything else, readable at full speed even for a multi-gigabyte file.
+- Space Lens: a bin under Settings → 数据 that lists every deleted session with
+  when and where it came from, restores items to their original folder (a
+  same-name file is never overwritten), removes single items, or empties it.
+
+### Fixed
+
+- Space Lens: the back gesture walks the container path one level per swipe and
+  only leaves the map at the container root; file bubbles no longer show the
+  internal `file:` prefix.
+- Restore picker popover is anchored to the table instead of the navigation bar,
+  which now holds the filter buttons.
+
 ## [0.3.1] — 2026-11-12
 
 - Storage panel: inspect and clean invalid or interrupted backups and temp files.

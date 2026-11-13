@@ -66,6 +66,8 @@ Everything is local. No account, no analytics, no cloud.
   generic grey placeholder that iOS returns for denied requests, and falls back
   to App Store artwork (iTunes Lookup) for store apps. See
   [Icons on stock iOS](#icons-on-stock-ios).
+- Filter by size and source, sort by scan order / name / size, and search by
+  name, Bundle ID or pinyin initials. Filters and sort are remembered.
 
 ### Backup
 
@@ -77,6 +79,9 @@ Everything is local. No account, no analytics, no cloud.
   scope, iOS version, timestamps and per-part hashes.
 - Backups can be exported as a `.wqbackup` package and imported again through
   the share sheet or Files.
+- The list is grouped per app with per-group totals and a search field;
+  optional retention (keep all / 1 / 3 / 5 / 10) trims old backups and never
+  touches automatic safety backups.
 - Load profiles: Standard, Automatic (backs off when the device gets hot) or
   Low-load, chosen in Settings. SHA-256, safety backups and rollback are kept
   in every profile.
@@ -100,10 +105,24 @@ Everything is local. No account, no analytics, no cloud.
   second stage can be turned off in Settings.
 - Live cancellation and operation history.
 
+### Space Lens
+
+- Browse an app container one level at a time as a bubble map: each child's
+  area follows its size, so the biggest folders stand out at a glance.
+- Drill into folders, jump anywhere from the breadcrumb, preview files, and
+  switch to a precise list at any time.
+- Preview images, JSON, text, video and audio in place; anything else falls back
+  to a hex dump, and a multi-gigabyte file still opens instantly.
+- Select several items to export or delete, swipe a row to delete one, or
+  long-press a bubble for preview, share, copy path or delete.
+- Deletions land in a bin (Settings → Data) that can restore items to their
+  original folder, remove them, or empty everything.
+
 ### History
 
 - Every backup, export, import, restore, rollback, cleanup and failure is
   recorded locally.
+- Export the whole record set as CSV for a spreadsheet or a bug report.
 - Records are grouped by day and operation type; groups collapse into a single
   card and expand to per-item details.
 

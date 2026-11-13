@@ -32,6 +32,7 @@ static NSLock *WQMOperationLock(void)
         case WQMOperationKindImport: return WQML(@"OPERATION_IMPORT", @"导入备份");
         case WQMOperationKindDeleteBackup: return WQML(@"OPERATION_DELETE_BACKUP", @"删除备份");
         case WQMOperationKindCleanCache: return WQML(@"OPERATION_CLEAN_CACHE", @"清理缓存");
+        case WQMOperationKindDeleteFiles: return WQML(@"OPERATION_DELETE_FILES", @"删除文件");
     }
     return WQML(@"OPERATION", @"操作");
 }
@@ -253,6 +254,68 @@ static WQMOperationRecord *WQMOperationRecordFromDictionary(NSDictionary *dictio
     gOperationStorageRoot = [root copy];
     gOperationRecords = nil;
     [lock unlock];
+}
+
+static NSString *WQMCSVField(NSString *value)
+{
+    if (!value.length) return @"";
+    BOOL needsQuotes = [value containsString:@","] ||
+                       [value containsString:@"\""] ||
+                       [value containsString:@"\n"] ||
+                       [value containsString:@"\r"];
+    if (!needsQuotes) return value;
+    NSString *escaped = [value stringByReplacingOccurrencesOfString:@"\"" withString:@"\"\""];
+    return [NSString stringWithFormat:@"\"%@\"", escaped];
+}
+
+static NSString *WQMCSVTimestamp(NSDate *date)
+{
+    if (!date) return @"";
+    NSDateFormatter *formatter = [NSDateFormatter new];
+    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    return [formatter stringFromDate:date];
+}
+
++ (NSString *)CSVExportForRecords:(NSArray<WQMOperationRecord *> *)records
+{
+    NSArray<NSString *> *header = @[
+        WQML(@"EXPORT_COLUMN_TIME", @"时间"),
+        WQML(@"EXPORT_COLUMN_KIND", @"操作"),
+        WQML(@"EXPORT_COLUMN_STATUS", @"状态"),
+        WQML(@"EXPORT_COLUMN_APP", @"App"),
+        @"Bundle ID",
+        WQML(@"EXPORT_COLUMN_SCOPE", @"范围"),
+        WQML(@"EXPORT_COLUMN_BYTES", @"大小（字节）"),
+        WQML(@"EXPORT_COLUMN_MESSAGE", @"说明"),
+        WQML(@"EXPORT_COLUMN_ERROR", @"错误"),
+    ];
+    NSMutableArray<NSString *> *lines = [NSMutableArray new];
+    [lines addObject:[header componentsJoinedByString:@","]];
+    for (WQMOperationRecord *record in records) {
+        NSArray<NSString *> *fields = @[
+            WQMCSVTimestamp(record.startedAt),
+            [WQMOperationRecord displayNameForKind:record.kind],
+            [WQMOperationRecord displayNameForStatus:record.status],
+            WQMCSVField(record.appName),
+            WQMCSVField(record.bundleIdentifier),
+            WQMCSVField(record.scope),
+            [NSString stringWithFormat:@"%llu", record.bytes],
+            WQMCSVField(record.message),
+            WQMCSVField(record.errorMessage),
+        ];
+        [lines addObject:[fields componentsJoinedByString:@","]];
+    }
+    // \uFEFF lets Excel detect UTF-8; other tools ignore it.
+    return [@"\uFEFF" stringByAppendingString:[lines componentsJoinedByString:@"\r\n"]];
+}
+
++ (NSString *)CSVExportFileNameForDate:(NSDate *)date
+{
+    NSDateFormatter *formatter = [NSDateFormatter new];
+    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    formatter.dateFormat = @"yyyyMMdd-HHmmss";
+    return [NSString stringWithFormat:@"WQManager-history-%@.csv", [formatter stringFromDate:date ?: NSDate.date]];
 }
 
 @end

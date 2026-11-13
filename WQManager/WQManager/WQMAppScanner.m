@@ -150,6 +150,44 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
 
 @end
 
+#if DEBUG
+static void WQMWriteSparseFile(NSString *path, unsigned long long bytes)
+{
+    NSFileManager *manager = NSFileManager.defaultManager;
+    [manager createDirectoryAtPath:path.stringByDeletingLastPathComponent
+       withIntermediateDirectories:YES attributes:nil error:nil];
+    [manager createFileAtPath:path contents:nil attributes:nil];
+    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
+    [handle truncateFileAtOffset:bytes];
+    [handle closeFile];
+}
+
+// A synthetic container so the space lens has something to draw in the
+// simulator, where no real app container can be read.
+static NSString *WQMSeedContainerFixture(void)
+{
+    NSString *root = [NSTemporaryDirectory() stringByAppendingPathComponent:@"WQMContainerFixture"];
+    if ([NSFileManager.defaultManager fileExistsAtPath:root]) return root;
+    unsigned long long GB = 1024ULL * 1024ULL * 1024ULL;
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"Documents/WeChat Files/chat.db"], 2.4 * GB);
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"Documents/WeChat Files/video/2026-11.mp4"], 2.1 * GB);
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"Documents/Download/books.epub"], 620 * 1024 * 1024);
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"Library/WeChatMM/video/moments.mp4"], 4.3 * GB);
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"Library/WeChatMM/image/stickers.zip"], 1.5 * GB);
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"Library/Caches/player.buffer"], 1.1 * GB);
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"Library/Preferences/com.tencent.xin.plist"], 12 * 1024);
+    WQMWriteSparseFile([root stringByAppendingPathComponent:@"tmp/upload.part"], 780 * 1024 * 1024);
+    NSString *json = @"{\n  \"account\": \"wx_1024\",\n  \"nickname\": \"木木\",\n  \"theme\": \"dark\",\n"
+                      "  \"sync\": { \"enabled\": true, \"interval\": 30, \"lastAt\": \"2026-11-13T09:29:00Z\" },\n"
+                      "  \"folders\": [\"Documents\", \"Library\", \"tmp\"],\n  \"version\": 8\n}\n";
+    [json writeToFile:[root stringByAppendingPathComponent:@"Documents/settings.json"]
+           atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    NSData *png = [[NSData alloc] initWithBase64EncodedString:@"iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAATUlEQVR4nO3PAQnAMBDAwPqrkgmcu0EnIw+9wAnIWpIkaWDP3mcSA7X7Btb7nVEM1AzUDNQM1AzUDNQM1AzUDNQM1AzUDNTuG5Ak3dAPBFDy933JBvYAAAAASUVORK5CYII=" options:0];
+    [png writeToFile:[root stringByAppendingPathComponent:@"Documents/avatar.png"] atomically:YES];
+    return root;
+}
+#endif
+
 @implementation WQMAppScanner
 
 - (void)scanWithCancellation:(WQScanCancellation *)cancellation
@@ -181,8 +219,10 @@ static BOOL WQMBundleIdentifierLooksValid(NSString *identifier)
                 WQMAppModel *app = [[WQMAppModel alloc]
                     initWithBundleIdentifier:fixture[1]
                                 displayName:fixture[0]
-                              containerPath:[@"/private/var/mobile/Containers/Data/Application/"
-                                             stringByAppendingString:NSUUID.UUID.UUIDString]
+                              containerPath:(apps.count == 0
+                                             ? WQMSeedContainerFixture()
+                                             : [@"/private/var/mobile/Containers/Data/Application/"
+                                                stringByAppendingString:NSUUID.UUID.UUIDString])
                                    dataSize:[fixture[2] unsignedLongLongValue]];
                 app.accessAvailable = YES;
                 app.identityKnown = YES;
