@@ -56,6 +56,7 @@ typedef NS_ENUM(NSInteger, WQMAppSortOrder) {
 
 + (NSArray<WQMBackupScopeDescriptor *> *)allDescriptors;
 + (nullable instancetype)descriptorForScope:(WQMBackupScope)scope;
++ (nullable instancetype)descriptorForPaths:(NSArray<NSString *> *)paths;
 
 @end
 

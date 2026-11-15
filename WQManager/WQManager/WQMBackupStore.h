@@ -12,6 +12,10 @@ extern NSNotificationName const WQMBackupStoreDidChangeNotification;
 @property (nonatomic, copy) NSString *scopeName;
 @property (nonatomic, copy) NSString *scopeCode;
 @property (nonatomic, copy) NSString *reason;
+@property (nonatomic, copy) NSString *note;
+@property (nonatomic) BOOL protectedBackup;
+@property (nonatomic) NSUInteger formatVersion;
+@property (nonatomic, copy) NSArray<NSString *> *requestedParts;
 @property (nonatomic, copy) NSArray<NSString *> *parts;
 @property (nonatomic, copy) NSDictionary<NSString *, NSString *> *partHashes;
 @property (nonatomic, copy) NSString *systemVersion;
@@ -44,6 +48,8 @@ extern NSNotificationName const WQMBackupStoreDidChangeNotification;
 
 + (NSString *)backupRoot;
 + (NSArray<WQMBackupRecord *> *)allBackups;
++ (BOOL)updateBackup:(WQMBackupRecord *)backup note:(NSString *)note
+          protected:(BOOL)protectedBackup error:(NSError *_Nullable *_Nullable)error;
 + (void)setBackupRootForTesting:(nullable NSString *)root;
 
 /// Groups records by Bundle ID, keeping each group's records newest first and

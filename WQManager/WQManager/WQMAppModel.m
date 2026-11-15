@@ -1,3 +1,4 @@
+#import "WQMBackupSelection.h"
 #import "WQMAppModel.h"
 #import "WQMLanguageManager.h"
 #import <sys/stat.h>
@@ -122,10 +123,22 @@
     WQMBackupScopeDescriptor *custom = [WQMBackupScopeDescriptor new];
     custom.scope = WQMBackupScopeCustom;
     custom.title = WQML(@"CUSTOM_BACKUP", @"自定义备份");
-    custom.detail = WQML(@"CUSTOM_BACKUP_DETAIL", @"后续可选择具体目录；当前阶段仅展示范围模型。");
+    custom.detail = WQML(@"CUSTOM_BACKUP_DETAIL", @"选择 Documents、Library 或 tmp 内需要保留的目录。");
     custom.relativePaths = @[];
 
     return @[quick, full, custom];
+}
+
++ (nullable instancetype)descriptorForPaths:(NSArray<NSString *> *)paths
+{
+    NSArray *canonical = [WQMBackupSelection canonicalPaths:paths];
+    if (!canonical) return nil;
+    WQMBackupScopeDescriptor *custom = [WQMBackupScopeDescriptor new];
+    custom.scope = WQMBackupScopeCustom;
+    custom.title = WQML(@"CUSTOM_BACKUP", @"自定义备份");
+    custom.detail = [canonical componentsJoinedByString:@", "];
+    custom.relativePaths = canonical;
+    return custom;
 }
 
 + (nullable instancetype)descriptorForScope:(WQMBackupScope)scope

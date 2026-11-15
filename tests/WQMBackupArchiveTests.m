@@ -63,6 +63,10 @@ int main(void)
         [manifest writeToFile:[backupPath stringByAppendingPathComponent:@"manifest.plist"] atomically:YES];
         WQMBackupRecord *source = [WQMBackupRecord recordAtPath:backupPath error:nil];
         WQMAssert(source != nil, @"source fixture should be valid");
+        NSError *metadataError = nil;
+        WQMAssert([WQMBackupStore updateBackup:source note:@"更新前" protected:YES error:&metadataError], @"metadata update succeeds");
+        source = [WQMBackupRecord recordAtPath:backupPath error:nil];
+        WQMAssert(source.protectedBackup && [source.note isEqual:@"更新前"], @"metadata persists");
 
         WQMBackupArchiveService *service = [WQMBackupArchiveService new];
         __block NSURL *exportURL = nil;
@@ -87,6 +91,13 @@ int main(void)
         WQMAssert([imported.bundleIdentifier isEqualToString:@"com.example.archive"],
                   @"import should preserve the bundle id");
 
+        WQMAssert(imported.protectedBackup && [imported.note isEqual:@"更新前"], @"export/import preserves note and protection");
+        __block BOOL rejected = NO;
+        [service deleteBackup:imported completion:^(BOOL success, NSError *error) { rejected = !success && error != nil; }];
+        WQMAssert(WQMWaitUntil(^BOOL { return rejected; }), @"protected backup deletion rejected in service");
+        WQMAssert([NSFileManager.defaultManager fileExistsAtPath:imported.path], @"protected payload survives");
+        WQMAssert([WQMBackupStore updateBackup:imported note:imported.note protected:NO error:nil], @"protection can be explicitly removed");
+        imported = [WQMBackupRecord recordAtPath:imported.path error:nil];
         __block BOOL deleted = NO;
         __block NSError *deleteError = nil;
         [service deleteBackup:imported completion:^(BOOL success, NSError *error) {

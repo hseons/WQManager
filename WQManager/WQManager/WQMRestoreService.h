@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
              progress:(nullable void (^)(NSString *status))progress
            completion:(void (^)(BOOL success, NSString *message, NSError *_Nullable error))completion;
 
++ (void)setRecoveryRootForTesting:(nullable NSString *)root;
 + (nullable NSString *)activeRecoverySummary;
 + (NSArray<NSString *> *)pendingRecoveryBackupPaths;
 + (void)recoverActiveRecoveryWithProgress:(nullable void (^)(NSString *status))progress

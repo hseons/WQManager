@@ -34,6 +34,7 @@
 @property (nonatomic, copy, nullable) NSString *statusText;
 @property (nonatomic, copy, nullable) void (^cancelHandler)(void);
 @property (nonatomic, readwrite, getter=isBusy) BOOL busy;
+@property (nonatomic) NSUInteger presentationGeneration;
 @property (nonatomic) BOOL expanded;
 @property (nonatomic) BOOL stopping;
 
@@ -77,6 +78,7 @@
         });
         return;
     }
+    self.presentationGeneration += 1;
     self.titleText = title ?: @"";
     self.statusText = status ?: @"";
     self.cancelHandler = cancelHandler;
@@ -146,7 +148,9 @@
         return;
     }
     self.busy = NO;
+    NSUInteger generation = self.presentationGeneration;
     [self animateOutWithCompletion:^{
+        if (generation != self.presentationGeneration) { if (completion) completion(); return; }
         self.window.hidden = YES;
         [self.spinner stopAnimating];
         self.cancelHandler = nil;

@@ -8,16 +8,20 @@
 #import "WQMStorageService.h"
 #import "WQAccess.h"
 #import "WQAppsSupport.h"
+#import "WQMBackupSelection.h"
+#import "WQAccessSafety.h"
 
 #import <errno.h>
 #import <fcntl.h>
 #import <sys/stat.h>
 #import <unistd.h>
 
+static NSString *gWQMRecoveryRoot;
 static NSString *const kWQMRestoreFormat = @"WQMRestoreJournal";
 
 static NSString *WQMRestoreDirectory(void)
 {
+    if (gWQMRecoveryRoot) return gWQMRecoveryRoot;
     return [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject]
             stringByAppendingPathComponent:@"RestoreRecovery"];
 }
@@ -129,17 +133,9 @@ static BOOL WQMRestoreWriteJournal(NSDictionary *journal, NSString *path, NSErro
 
 static BOOL WQMRestoreAllowedPart(NSString *part)
 {
-    return [part isEqualToString:@"Documents"] ||
-           [part isEqualToString:@"Library"] ||
-           [part isEqualToString:@"tmp"];
+    return [WQMBackupSelection isAllowedPath:part];
 }
 
-static NSArray<NSString *> *WQMRestorePartsForScopeCode(NSString *scopeCode)
-{
-    if ([scopeCode isEqualToString:@"quick"]) return @[@"Documents", @"Library"];
-    if ([scopeCode isEqualToString:@"full"]) return @[@"Documents", @"Library", @"tmp"];
-    return @[];
-}
 
 static BOOL WQMRestoreValidateApp(WQMAppModel *app, NSString **reason)
 {
@@ -181,7 +177,10 @@ static BOOL WQMRestoreVerifyBackup(WQMBackupRecord *record, WQMLoadController *l
     }
     NSString *loadError = nil;
     WQMBackupRecord *fresh = [WQMBackupRecord recordAtPath:path error:&loadError];
-    if (!fresh || ![fresh.bundleIdentifier isEqualToString:record.bundleIdentifier]) {
+    if (!fresh || ![fresh.bundleIdentifier isEqualToString:record.bundleIdentifier] ||
+        ![fresh.manifestFingerprint isEqualToString:record.manifestFingerprint] ||
+        ![fresh.requestedParts isEqualToArray:record.requestedParts] ||
+        ![fresh.parts isEqualToArray:record.parts] || ![fresh.partHashes isEqualToDictionary:record.partHashes]) {
         if (reason) *reason = loadError ?: WQML(@"RESTORE_ERROR_BACKUP_CHANGED",
                                                 @"备份清单已变化或无效");
         return NO;
@@ -326,6 +325,12 @@ static BOOL WQMRestoreApply(NSString *container, NSArray<NSString *> *requestedP
             return NO;
         }
         NSString *target = [container stringByAppendingPathComponent:part];
+        int parentFD = WQOpenDirectoryNoLinks(target.stringByDeletingLastPathComponent);
+        if (parentFD < 0 && errno != ENOENT) {
+            if (reason) *reason = WQML(@"RESTORE_SELECTION_LINK", @"恢复目录的父路径含链接或不可访问。");
+            return NO;
+        }
+        if (parentFD >= 0) close(parentFD);
         struct stat current = {0};
         if (wq_stat(target, &current) && !S_ISDIR(current.st_mode)) {
             if (reason) *reason = [NSString stringWithFormat:
@@ -425,6 +430,8 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
 
 @implementation WQMRestoreService
 
++ (void)setRecoveryRootForTesting:(NSString *)root { gWQMRecoveryRoot = [root copy]; }
+
 - (void)restoreBackup:(WQMBackupRecord *)backup
                 toApp:(WQMAppModel *)app
              progress:(nullable void (^)(NSString *status))progress
@@ -470,7 +477,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
                             @"备份与目标 App 的 Bundle ID 不一致。"), nil);
             return;
         }
-        NSArray<NSString *> *requestedParts = WQMRestorePartsForScopeCode(backup.scopeCode);
+        NSArray<NSString *> *requestedParts = backup.requestedParts;
         if (!requestedParts.count) {
             finish(NO, WQML(@"RESTORE_ERROR_UNKNOWN_SCOPE", @"备份范围无法识别。"), nil);
             return;
@@ -502,11 +509,13 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
         operation.backupPath = backup.path;
         [WQMOperationStore updateRecord:operation];
 
-        NSInteger safetyScope = [backup.scopeCode isEqualToString:@"full"]
-            ? WQMBackupScopeFull : WQMBackupScopeQuick;
+        WQMBackupScopeDescriptor *safetySelection = backup.formatVersion == 3
+            ? [WQMBackupScopeDescriptor descriptorForPaths:requestedParts]
+            : [WQMBackupScopeDescriptor descriptorForScope:[backup.scopeCode isEqualToString:@"full"]
+                ? WQMBackupScopeFull : WQMBackupScopeQuick];
         report(WQML(@"RESTORE_PROGRESS_SAFETY_BACKUP", @"正在备份目标当前数据…"));
         WQMBackupService *backupService = [WQMBackupService new];
-        [backupService backupApp:app scope:safetyScope
+        [backupService backupApp:app selection:safetySelection
                           reason:WQML(@"RESTORE_SAFETY_REASON", @"恢复前自动安全备份")
                         progress:report
                       completion:^(WQMBackupRecord *safety, NSError *backupError) {
@@ -746,7 +755,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
         NSString *container = active[@"Container"];
         NSArray *parts = active[@"RequestedParts"];
         NSString *safetyPath = active[@"SafetyBackup"];
-        BOOL partsValid = [parts isKindOfClass:NSArray.class];
+        BOOL partsValid = [[WQMBackupSelection canonicalPaths:parts] isEqualToArray:parts];
         if (partsValid) {
             for (id part in parts) {
                 if (![part isKindOfClass:NSString.class] || !WQMRestoreAllowedPart(part)) {
@@ -762,7 +771,7 @@ static BOOL WQMRestoreTargetMatchesBackup(NSString *container, NSArray<NSString 
         }
         WQMBackupRecord *safety = [WQMBackupRecord recordAtPath:safetyPath error:nil];
         NSString *reason = nil;
-        if (!safety || ![safety.bundleIdentifier isEqualToString:bundleID] ||
+        if (!safety || ![safety.requestedParts isEqualToArray:parts] || ![safety.bundleIdentifier isEqualToString:bundleID] ||
             !WQMRestoreVerifyBackup(safety, load, &reason)) {
             finish(NO, reason ?: WQML(@"RECOVERY_ERROR_SAFETY_UNAVAILABLE",
                                       @"自动安全备份已不可用，需要人工检查。"), nil);

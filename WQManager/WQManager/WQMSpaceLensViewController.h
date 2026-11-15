@@ -17,6 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)init NS_UNAVAILABLE;
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)initWithApp:(WQMAppModel *)app NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithApp:(WQMAppModel *)app relativePath:(NSString *)relativePath;
 - (instancetype)initWithCoder:(NSCoder *)coder NS_UNAVAILABLE;
 - (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil
     NS_UNAVAILABLE;

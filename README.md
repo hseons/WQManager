@@ -132,6 +132,31 @@ Everything is local. No account, no analytics, no cloud.
 - Light, high-contrast, large-type-friendly layout with Dynamic Type support.
 - Legal gate, safety documentation and third-party credits built in.
 
+## New workflows in 0.4.0
+
+- Apps → App tools: storage changes (60 scan snapshots, growth ranking and per-app
+  trends) and serial batch quick/full backups. Unknown sizes and changed containers
+  start a new history series. Growth does not mean reclaimable space.
+- App action sheet → Find files: filename/path search, size ranking, extension and
+  minimum-size filters, previews and a jump to the containing folder. Indexing is
+  bounded to 50,000 files / 100,000 entries; up to 1,000 results are shown and
+  incomplete scans are labeled.
+- Custom backups: browse and select up to 128 directories inside Documents,
+  Library or tmp. Restore replaces only those directories, preserving siblings.
+  Selecting only Documents may omit settings and sign-in state.
+- Backup menu: notes, important-backup protection, content browsing and comparison.
+  Protection survives export/import, excludes a backup from retention counts and
+  must be removed before deletion. Protection is enforced by version 0.4.0 and later.
+- Compare backups of the same app and directory scope using metadata, or request
+  SHA-256 content comparison. Only regular files are compared, excluding empty
+  directories, links and special files.
+- Existing quick/full backups retain format 2. Custom backups use format 3 and
+  require WQManager 0.4.0 or later to import.
+- Stopping a batch finishes its active backup first. Keep the app in the foreground;
+  interrupted batches keep completed backups, but do not resume pending jobs.
+
+See [the next WQ capability plan](docs/NEXT_STEPS_WQ.md) for future research.
+
 ## Icons on stock iOS
 
 iOS does not let an unentitled third-party app ask IconServices for another

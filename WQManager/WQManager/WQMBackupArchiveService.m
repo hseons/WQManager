@@ -256,6 +256,10 @@ static BOOL WQMArchiveVerifyPayload(WQMBackupRecord *backup, NSString **reason)
                                                          @"备份记录无效")));
             return;
         }
+        if (verified.protectedBackup) {
+            finish(NO, WQMArchiveError(8, WQML(@"BACKUP_PROTECTED_DELETE", @"请先取消重要备份保护，再删除这份备份。")));
+            return;
+        }
         WQMOperationRecord *operation = [WQMOperationStore beginOperation:WQMOperationKindDeleteBackup
                                                                   appName:verified.displayName
                                                          bundleIdentifier:verified.bundleIdentifier];

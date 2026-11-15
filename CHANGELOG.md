@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.4.0] — 2026-11-15
+
+### Added
+
+- Storage changes: keep the last 60 scan snapshots, rank app growth, and show
+  per-app history with a trend line. Unknown measurements and changed container
+  identities break a series instead of producing misleading deltas.
+- Find files: bounded, cancellable metadata indexing inside one app, size ranking,
+  filename/path search, extension/minimum-size filters, previews and a direct
+  jump to the containing folder in Space Lens. Partial scans are labeled.
+- Batch backups: select apps, run quick/full backups sequentially, inspect results,
+  retry failed items, and stop pending jobs after the active backup completes.
+- Backup notes and important-backup protection, preserved through export/import.
+  Protected backups are excluded from automatic retention and manual deletion
+  until protection is explicitly removed.
+- Browse backup contents and compare same-app, same-scope backups. Metadata
+  comparison is the default; optional SHA-256 comparison reads equal-sized file
+  contents. Incomplete scans do not produce a complete comparison result.
+- Custom backups: select up to 128 directories inside Documents, Library or tmp.
+  Format 3 records the exact requested paths; restore and automatic safety backup
+  use that same scope, preserving unselected siblings. Format 2 stays readable.
+- WQ extension research plan: capability diagnostics, read-only App Groups and
+  extension-container overview, structured-file inspection and directory changes.
+
+### Changed
+
+- App action sheet scrolls to accommodate the additional tools and large text.
+- New directory reads share the operation gate with mutations. An old banner
+  dismissal no longer hides a newly started operation.
+- Custom retention groups include the directory selection, keeping unrelated
+  custom selections independent. Backup metadata writes are atomic and synced.
+
+### Validation
+
+- Added portable tests for scan history, file catalogs, serial queues, custom
+  selection validation and real backup/restore services with an injected access
+  bridge, including low-load restore, export/import and failure rollback.
+- Container authorization, signing and power-loss behavior still need supported
+  physical-device validation. The next-step plan records these gates.
+
 ## [0.3.2] — 2026-11-13
 
 ### Added

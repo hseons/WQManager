@@ -122,6 +122,47 @@ import copies the package into a temporary location, re-validates the manifest
 and every part hash, then publishes it into the store. No zip layer is involved,
 so exports are transparent folders that can be inspected with normal tools.
 
+### Directory selections, notes and protection (0.4.0)
+
+Quick/full backups continue to use format 2. Format 3 is used only for custom
+backups. It stores `RequestedParts` (the exact selected directories) separately
+from `Parts` (directories present in the payload). Paths stay inside Documents,
+Library or tmp; canonicalization rejects traversal, case aliases and overlapping
+selections. Unregistered payload ancestors/siblings and linked ancestors are
+rejected. Older versions reject format 3 rather than interpreting it as a full
+restore.
+
+Restore and its automatic safety backup use the same requested directories,
+including selections missing from the source or target. Journals retain that
+exact scope for rollback and manual recovery. Unselected siblings are preserved.
+Retention groups custom backups by app and directory selection.
+
+Optional `Note` and `Protected` fields travel in the manifest. Notes are limited
+to 300 characters. Metadata writes stage a separate file outside the backup
+unit, synchronize it, and rename it into place. Protection is enforced by both
+manual deletion and retention; protected copies do not consume the ordinary
+retention allowance. Metadata updates and pruning share a lock.
+
+### Read-only indexes and serial batches (0.4.0)
+
+`WQMScanHistory` stores at most 60 completed scan snapshots and caches the loaded
+history. Unknown measurements and changed device/inode identity break a series.
+It adds no background scans or new data access.
+
+`WQMFileCatalog` walks directories through no-follow descriptors with limits of
+50,000 files, 100,000 entries and 64 directory levels. Search is in the bounded
+metadata index, showing up to 1,000 results. Links and special nodes are skipped;
+unreadable or limited scans are explicitly partial. Backup comparison requires
+complete indexes, excludes manifests, and distinguishes metadata from optional
+streamed SHA-256 content comparison. Exact hashing verifies the file identity
+captured at index time and rejects mutations while reading.
+
+New directory readers use the long-operation gate so they do not release a
+container token during a conflicting mutation. `WQMBackupQueue` is main-thread
+owned and invokes the existing service sequentially. Stop marks pending jobs
+cancelled and lets the current backup complete; retry selects failed jobs only.
+The queue is process-local, with no background or restart-resume guarantee.
+
 ## Restore state machine
 
 Restore only targets the same bundle identifier. The high-level sequence:

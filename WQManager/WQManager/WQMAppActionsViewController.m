@@ -80,6 +80,12 @@
                                            symbol:@"circle.grid.2x2"
                                           primary:NO
                                            action:WQMAppActionInspectSpace];
+    UIButton *find = [self actionButtonWithTitle:WQML(@"FILE_FINDER", @"文件查找")
+                                        subtitle:WQML(@"FILE_FINDER_SUBTITLE", @"大文件、搜索与类型筛选")
+                                          symbol:@"doc.text.magnifyingglass" primary:NO action:WQMAppActionFindFiles];
+    UIButton *custom = [self actionButtonWithTitle:WQML(@"CUSTOM_BACKUP", @"自定义备份")
+                                          subtitle:WQML(@"CUSTOM_BACKUP_SUBTITLE", @"选择需要保留的目录")
+                                            symbol:@"folder.badge.gearshape" primary:NO action:WQMAppActionCustomBackup];
     UIButton *copy = [self actionButtonWithTitle:WQML(@"COPY_BUNDLE", @"复制 Bundle ID")
                                         subtitle:_app.bundleIdentifier
                                           symbol:@"doc.on.doc"
@@ -87,15 +93,26 @@
                                           action:WQMAppActionCopyBundleID];
 
     UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[
-        header, quick, full, restore, space, copy
+        header, quick, full, custom, restore, space, find, copy
     ]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.spacing = 10;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     [stack setCustomSpacing:20 afterView:header];
-    [self.view addSubview:stack];
-
-    UILayoutGuide *guide = self.view.safeAreaLayoutGuide;
+    UIScrollView *scroll = [UIScrollView new];
+    scroll.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:scroll];
+    [scroll addSubview:stack];
+    UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [scroll.topAnchor constraintEqualToAnchor:safe.topAnchor],
+        [scroll.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor],
+        [scroll.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor],
+        [scroll.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor],
+        [stack.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-36],
+        [stack.bottomAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.bottomAnchor constant:-18],
+    ]];
+    UILayoutGuide *guide = scroll.contentLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
         [stack.topAnchor constraintEqualToAnchor:guide.topAnchor constant:18],
         [stack.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:18],

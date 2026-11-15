@@ -1,3 +1,7 @@
+#import "WQMStorageChangesViewController.h"
+#import "WQMBackupQueueViewController.h"
+#import "WQMBackupSelectionViewController.h"
+#import "WQMFilesViewController.h"
 #import "WQMAppsViewController.h"
 #import "WQMAppModel.h"
 #import "WQMAppScanner.h"
@@ -396,6 +400,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     NSString *_query;
     NSString *_status;
     WQScanCancellation *_scanCancellation;
+    WQMBackupQueueViewController *_batchController;
     NSUInteger _scanGeneration;
     BOOL _scanning;
     WQMConfirmationGate *_restoreGate;
@@ -492,7 +497,8 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
 {
 #if DEBUG
     if (_pushedFixtureLens || !_visibleApps.count) return;
-    if (![NSProcessInfo.processInfo.environment[@"WQM_UI_LENS"] boolValue]) return;
+    NSString *feature = NSProcessInfo.processInfo.environment[@"WQM_UI_FEATURE"];
+    if (![NSProcessInfo.processInfo.environment[@"WQM_UI_LENS"] boolValue] && !feature.length) return;
     _pushedFixtureLens = YES;
     WQMAppModel *app = _visibleApps.firstObject;
     NSString *wanted = NSProcessInfo.processInfo.environment[@"WQM_UI_LENS_APP"];
@@ -503,7 +509,17 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        [self showSpaceLensForApp:app];
+        if ([feature isEqual:@"history"]) [self showStorageChanges];
+        else if ([feature isEqual:@"trend"]) [self.navigationController pushViewController:[[WQMStorageChangesViewController alloc] initWithApp:app] animated:NO];
+        else if ([feature isEqual:@"batch"]) [self showBackupQueue];
+        else if ([feature isEqual:@"files"]) [self.navigationController pushViewController:[[WQMFilesViewController alloc] initWithApp:app] animated:NO];
+        else if ([feature isEqual:@"selection"]) [self.navigationController pushViewController:[[WQMBackupSelectionViewController alloc] initWithApp:app completion:^(WQMBackupScopeDescriptor *selection) {}] animated:NO];
+        else if ([feature isEqual:@"backup"] || [feature isEqual:@"compare"]) {
+            NSArray *records = [WQMBackupStore allBackups];
+            WQMBackupRecord *first = records.firstObject, *second = nil;
+            for (WQMBackupRecord *record in records) if (![record.path isEqual:first.path] && [record.bundleIdentifier isEqual:first.bundleIdentifier] && [record.requestedParts isEqual:first.requestedParts]) { second = record; break; }
+            if (first) [self.navigationController pushViewController:second && [feature isEqual:@"compare"] ? [[WQMFilesViewController alloc] initComparingOlder:second newer:first] : [[WQMFilesViewController alloc] initWithBackup:first] animated:NO];
+        } else [self showSpaceLensForApp:app];
     });
 #endif
 }
@@ -792,6 +808,13 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     group.alignment = UIStackViewAlignmentCenter;
     group.spacing = 14;
     self.navigationItem.rightBarButtonItems = @[[[UIBarButtonItem alloc] initWithCustomView:group]];
+    __weak typeof(self) weakSelf = self;
+    UIMenu *tools = [UIMenu menuWithChildren:@[
+        [UIAction actionWithTitle:WQML(@"SPACE_CHANGES", @"空间变化") image:[UIImage systemImageNamed:@"chart.line.uptrend.xyaxis"] identifier:nil handler:^(UIAction *action) { [weakSelf showStorageChanges]; }],
+        [UIAction actionWithTitle:WQML(@"BATCH_BACKUP", @"批量备份") image:[UIImage systemImageNamed:@"square.stack.3d.up"] identifier:nil handler:^(UIAction *action) { [weakSelf showBackupQueue]; }],
+    ]];
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"ellipsis.circle"] menu:tools];
+    self.navigationItem.leftBarButtonItem.accessibilityLabel = WQML(@"APP_TOOLS", @"应用工具");
 }
 
 /// Compact bar button for the filter and sort menus: text only at 12 pt, because
@@ -1004,6 +1027,18 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
             [self showSpaceLensForApp:app];
             return;
         }
+        if (action == WQMAppActionFindFiles) {
+            [self.navigationController pushViewController:[[WQMFilesViewController alloc] initWithApp:app] animated:YES];
+            return;
+        }
+        if (action == WQMAppActionCustomBackup) {
+            __weak typeof(self) weakSelf = self;
+            WQMBackupSelectionViewController *picker = [[WQMBackupSelectionViewController alloc] initWithApp:app completion:^(WQMBackupScopeDescriptor *selection) {
+                [weakSelf confirmBackupForApp:app scope:selection];
+            }];
+            [self.navigationController pushViewController:picker animated:YES];
+            return;
+        }
         WQMBackupScope scope = action == WQMAppActionFullBackup
             ? WQMBackupScopeFull : WQMBackupScopeQuick;
         WQMBackupScopeDescriptor *descriptor = [WQMBackupScopeDescriptor descriptorForScope:scope];
@@ -1012,6 +1047,18 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     [self presentViewController:actions animated:YES completion:^{
         actions.presentationController.delegate = self;
     }];
+}
+
+- (void)showStorageChanges
+{
+    [self.navigationController pushViewController:[[WQMStorageChangesViewController alloc] initWithApps:_apps] animated:YES];
+}
+
+- (void)showBackupQueue
+{
+    if (!_batchController) _batchController = [[WQMBackupQueueViewController alloc] initWithApps:_apps];
+    else [_batchController updateApps:_apps];
+    [self.navigationController pushViewController:_batchController animated:YES];
 }
 
 - (void)showSpaceLensForApp:(WQMAppModel *)app
@@ -1271,7 +1318,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     [UIApplication sharedApplication].idleTimerDisabled = YES;
 
     WQMBackupService *service = [WQMBackupService new];
-    [service backupApp:app scope:scope.scope reason:@"" progress:^(NSString *status) {
+    [service backupApp:app selection:scope reason:@"" progress:^(NSString *status) {
         [banner updateStatus:status];
     } completion:^(WQMBackupRecord *backup, NSError *error) {
         [UIApplication sharedApplication].idleTimerDisabled = NO;

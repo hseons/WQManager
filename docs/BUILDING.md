@@ -18,7 +18,7 @@
 | App Group | `group.mumu.wqmanager` |
 | Scheme | `WQManager` |
 | Deployment target | `26.0` |
-| Marketing version | `0.3.2` |
+| Marketing version | `0.4.0` |
 
 If you fork the project, change the bundle identifiers, the App Group, and the
 entitlements of **both** targets to your own values. The app and the share
@@ -104,6 +104,8 @@ only in `DEBUG` builds.
 | `WQM_UI_SETTINGS_SCROLL=1` | scroll Settings to the bottom |
 | `WQM_UI_BACKUP_QUERY=wx` | prefill the backup search field |
 | `WQM_UI_ACTION_PANEL=1` | open the action sheet for the first app |
+| `WQM_UI_FEATURE=files` | open a new feature with fixture data: `files`, `history`, `trend`, `batch`, `selection`, `backup`, or `compare` |
+| `WQM_UI_RESEED_BACKUPS=1` | add backup fixtures for comparison screenshots (Debug only) |
 | `WQM_UI_LENS=1` | push the Space Lens for the first app (fixture app 微信 gets a synthetic 13.71 GB container) |
 | `WQM_UI_LENS_APP=com.tencent.xin` | pick which app the Space Lens opens |
 | `WQM_UI_LENS_DRILL=Library/WeChatMM` | drill straight into that folder path |

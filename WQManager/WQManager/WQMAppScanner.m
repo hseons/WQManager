@@ -1,4 +1,5 @@
 #import "WQMAppScanner.h"
+#import "WQMScanHistory.h"
 #import "WQMAppModel.h"
 #import "WQMLanguageManager.h"
 #import "WQAccess.h"
@@ -228,6 +229,11 @@ static NSString *WQMSeedContainerFixture(void)
                 app.identityKnown = YES;
                 app.containerDevice = 1;
                 app.containerInode = 1;
+                struct stat fixtureIdentity;
+                if (apps.count == 0 && lstat(app.containerPath.fileSystemRepresentation, &fixtureIdentity) == 0) {
+                    app.containerDevice = fixtureIdentity.st_dev;
+                    app.containerInode = fixtureIdentity.st_ino;
+                }
                 if (limitedFixture && apps.count == 1) {
                     app.accessAvailable = NO;
                     app.identityKnown = NO;
@@ -235,6 +241,16 @@ static NSString *WQMSeedContainerFixture(void)
                     app.dataSize = 0;
                 }
                 [apps addObject:app];
+            }
+            if (NSProcessInfo.processInfo.environment[@"WQM_UI_FEATURE"].length &&
+                [WQMScanHistory samplesForApp:apps.firstObject].count == 0) {
+                WQMAppModel *first = apps.firstObject;
+                unsigned long long original = first.dataSize;
+                for (NSUInteger index = 0; index < 6; index++) {
+                    first.dataSize = original - (6 - index) * 100ULL * 1024 * 1024;
+                    [WQMScanHistory recordApps:apps atDate:[NSDate dateWithTimeIntervalSinceNow:-3600 * (6 - index)]];
+                }
+                first.dataSize = original;
             }
             result.apps = apps;
             result.limitedCount = limitedFixture ? 1 : 0;

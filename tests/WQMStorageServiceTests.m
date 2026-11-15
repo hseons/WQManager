@@ -134,7 +134,40 @@ int main(void)
         WQMAssert(removed == 0, @"protected safety backup should not be removed");
         WQMAssert([fm fileExistsAtPath:safetyProtected], @"protected safety backup should survive");
 
+        NSString *lockedOld = WQMMakeBackup(backupRoot, @"com.locked.app", @"20260101-000000", @"", older, 512);
+        NSString *lockedNew = WQMMakeBackup(backupRoot, @"com.locked.app", @"20260102-000000", @"", newer, 512);
+        NSString *lockedManifest = [lockedOld stringByAppendingPathComponent:@"manifest.plist"];
+        NSMutableDictionary *lockedFields = [[NSDictionary dictionaryWithContentsOfFile:lockedManifest] mutableCopy];
+        lockedFields[@"Protected"] = @YES;
+        [lockedFields writeToFile:lockedManifest atomically:YES];
+        [WQMStorageService pruneBackupsKeeping:1 excluding:[NSSet set] deletedBytes:NULL];
+        WQMAssert([fm fileExistsAtPath:lockedOld] && [fm fileExistsAtPath:lockedNew], @"protected backups survive in addition to the ordinary retention count");
+
         // Retention keeps only the newest backups of one app and scope.
+        // A delimiter inside a legal folder name must not merge two scopes.
+        NSMutableArray *customPaths = [NSMutableArray new];
+        for (NSArray *selection in @[@[@"Documents/a;Documents/b"], @[@"Documents/a", @"Documents/b"]]) {
+            for (NSUInteger i = 0; i < 2; i++) {
+                NSString *path = WQMMakeBackup(backupRoot, @"com.scopes.app", NSUUID.UUID.UUIDString,
+                    @"", [NSDate dateWithTimeIntervalSince1970:100 + i], 1);
+                [fm removeItemAtPath:[path stringByAppendingPathComponent:@"Documents/payload.bin"] error:nil];
+                NSMutableDictionary *fields = [[NSDictionary dictionaryWithContentsOfFile:[path stringByAppendingPathComponent:@"manifest.plist"]] mutableCopy];
+                fields[@"Format"] = @3; fields[@"ScopeCode"] = @"custom";
+                fields[@"Parts"] = selection; fields[@"RequestedParts"] = selection;
+                NSMutableDictionary *hashes = [NSMutableDictionary new];
+                for (NSString *part in selection) {
+                    [fm createDirectoryAtPath:[path stringByAppendingPathComponent:part] withIntermediateDirectories:YES attributes:nil error:nil];
+                    hashes[part] = @"hash";
+                }
+                fields[@"PartHashes"] = hashes;
+                [fields writeToFile:[path stringByAppendingPathComponent:@"manifest.plist"] atomically:YES];
+                [customPaths addObject:path];
+            }
+        }
+        removed = [WQMStorageService pruneBackupsKeeping:1 excluding:[NSSet set] deletedBytes:NULL];
+        WQMAssert(removed == 2, @"custom scope grouping is unambiguous even with delimiter-like folder names");
+        WQMAssert([fm fileExistsAtPath:customPaths[1]] && [fm fileExistsAtPath:customPaths[3]], @"newest backup of each exact custom selection survives");
+
         NSString *retentionBundle = @"com.retention.app";
         NSMutableArray<NSString *> *retentionPaths = [NSMutableArray new];
         for (NSUInteger index = 0; index < 4; index++) {

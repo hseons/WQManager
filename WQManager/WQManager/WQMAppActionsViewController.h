@@ -10,6 +10,8 @@ typedef NS_ENUM(NSInteger, WQMAppAction) {
     WQMAppActionRestore,
     WQMAppActionInspectSpace,
     WQMAppActionCopyBundleID,
+    WQMAppActionFindFiles,
+    WQMAppActionCustomBackup,
 };
 
 @interface WQMAppActionsViewController : UIViewController

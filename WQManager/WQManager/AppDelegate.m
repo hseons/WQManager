@@ -41,7 +41,7 @@
         }
     }
     if ([NSProcessInfo.processInfo.environment[@"WQM_UI_FIXTURES"] boolValue] &&
-        [WQMBackupStore allBackups].count == 0) {
+        ([WQMBackupStore allBackups].count == 0 || getenv("WQM_UI_RESEED_BACKUPS"))) {
         [self seedBackupFixtures];
     }
 #endif
@@ -57,6 +57,7 @@
     NSDate *now = NSDate.date;
     NSArray<NSArray *> *fixtures = @[
         @[@"微信", @"com.tencent.xin", @"快速备份", @"quick", @(6442450944ULL), @0, @(-2)],
+        @[@"微信", @"com.tencent.xin", @"快速备份", @"quick", @(6442450944ULL), @4, @(-14)],
         @[@"微信", @"com.tencent.xin", @"完整备份", @"full", @(12884901888ULL), @1, @(-26)],
         @[@"剪映", @"com.lemon.lv", @"快速备份", @"quick", @(4939212390ULL), @2, @(-50)],
         @[@"抖音", @"com.ss.iphone.ugc.Aweme", @"恢复前自动安全备份", @"safety", @(3758096384ULL), @3, @(-74)],

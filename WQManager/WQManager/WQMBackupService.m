@@ -6,6 +6,7 @@
 #import "WQMOperationStore.h"
 #import "WQAccess.h"
 #import "WQAppsSupport.h"
+#import "WQAccessSafety.h"
 
 #import <errno.h>
 #import <fcntl.h>
@@ -41,6 +42,16 @@ static BOOL WQMSyncDirectory(NSString *path)
          progress:(nullable void (^)(NSString *status))progress
        completion:(void (^)(WQMBackupRecord *_Nullable backup, NSError *_Nullable error))completion
 {
+    WQMBackupScopeDescriptor *selection = [WQMBackupScopeDescriptor descriptorForScope:(WQMBackupScope)scope];
+    [self backupApp:app selection:selection reason:reason progress:progress completion:completion];
+}
+
+- (void)backupApp:(WQMAppModel *)app
+        selection:(WQMBackupScopeDescriptor *)descriptor
+           reason:(NSString *)reason
+         progress:(void (^)(NSString *))progress
+       completion:(void (^)(WQMBackupRecord *, NSError *))completion
+{
     WQMLoadController *load = [WQMLoadController controllerForCurrentPreferences];
     dispatch_async(dispatch_get_global_queue(load.plan.qos, 0), ^{
         __block WQMOperationRecord *operation = nil;
@@ -59,8 +70,6 @@ static BOOL WQMSyncDirectory(NSString *path)
             dispatch_async(dispatch_get_main_queue(), ^{ completion(backup, error); });
         };
 
-        WQMBackupScopeDescriptor *descriptor =
-            [WQMBackupScopeDescriptor descriptorForScope:(WQMBackupScope)scope];
         if (!descriptor || descriptor.relativePaths.count == 0) {
             finish(nil, [NSError errorWithDomain:@"WQMBackupService" code:1
                                         userInfo:@{NSLocalizedDescriptionKey:
@@ -152,9 +161,15 @@ static BOOL WQMSyncDirectory(NSString *path)
             @autoreleasepool {
                 report([NSString stringWithFormat:WQML(@"BACKUP_PROGRESS_PART", @"正在备份 %@…"), part]);
                 NSString *source = [app.containerPath stringByAppendingPathComponent:part];
+                int sourceFD = WQOpenDirectoryNoLinks(source);
+                if (sourceFD < 0 && errno != ENOENT) {
+                    failure = WQML(@"BACKUP_SELECTION_UNAVAILABLE", @"所选目录含链接、已变化或不可访问，请刷新后重试。");
+                    break;
+                }
+                if (sourceFD >= 0) close(sourceFD);
                 struct stat sourceStat = {0};
                 if (!wq_stat(source, &sourceStat)) {
-                    if (errno == ENOENT) continue;
+                    if (errno == ENOENT) { sourceStates[part] = @"missing"; continue; }
                     failure = [NSString stringWithFormat:
                                WQML(@"BACKUP_ERROR_READ_PART", @"无法读取 %@"), part];
                     break;
@@ -223,8 +238,14 @@ static BOOL WQMSyncDirectory(NSString *path)
         }
 
         if (!failure) {
-            for (NSString *part in parts) {
+            for (NSString *part in descriptor.relativePaths) {
                 NSString *source = [app.containerPath stringByAppendingPathComponent:part];
+                if ([sourceStates[part] isEqual:@"missing"]) {
+                    struct stat absent;
+                    if (lstat(source.fileSystemRepresentation, &absent) != 0 && errno == ENOENT) continue;
+                    failure = WQML(@"BACKUP_ERROR_SOURCE_CHANGED", @"App 数据在备份过程中发生变化，未生成完整备份");
+                    break;
+                }
                 BOOL exists = NO;
                 NSString *current = WQAppsSupportTreeSignature(source, YES, &exists, &failure);
                 if (!current || !exists || ![current isEqualToString:sourceStates[part]]) {
@@ -238,11 +259,13 @@ static BOOL WQMSyncDirectory(NSString *path)
         NSString *systemVersion = NSProcessInfo.processInfo.operatingSystemVersionString ?: @"unknown";
         NSDictionary *manifest = @{
             @"Complete": @YES,
-            @"Format": @2,
+            @"Format": descriptor.scope == WQMBackupScopeCustom ? @3 : @2,
             @"BundleID": app.bundleIdentifier,
             @"DisplayName": app.displayName ?: app.bundleIdentifier,
             @"Scope": descriptor.title,
-            @"ScopeCode": scope == WQMBackupScopeFull ? @"full" : @"quick",
+            @"ScopeCode": descriptor.scope == WQMBackupScopeCustom ? @"custom" :
+                (descriptor.scope == WQMBackupScopeFull ? @"full" : @"quick"),
+            @"RequestedParts": descriptor.relativePaths,
             @"Reason": reason ?: @"",
             @"Created": created,
             @"Parts": parts,

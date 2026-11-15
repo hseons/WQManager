@@ -1,6 +1,7 @@
 #import "WQMAppCache.h"
 #import "WQMAppModel.h"
 #import "WQMAppScanner.h"
+#import "WQMScanHistory.h"
 
 #import <sys/stat.h>
 
@@ -93,6 +94,7 @@ static NSString *WQMAppCachePath(void)
                                                               options:0
                                                                 error:nil];
     [data writeToFile:WQMAppCachePath() options:NSDataWritingAtomic error:nil];
+    [WQMScanHistory recordApps:result.apps atDate:root[@"UpdatedAt"]];
 }
 
 + (void)clear

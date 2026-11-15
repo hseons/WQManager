@@ -192,6 +192,20 @@ typedef NS_ENUM(NSInteger, WQMLensSortOrder) {
     return self;
 }
 
+- (instancetype)initWithApp:(WQMAppModel *)app relativePath:(NSString *)relativePath
+{
+    self = [self initWithApp:app];
+    if (self && relativePath.length && !relativePath.isAbsolutePath) {
+        NSString *current = app.containerPath;
+        for (NSString *component in [relativePath componentsSeparatedByString:@"/"]) {
+            if (!component.length || [component isEqualToString:@"."] || [component isEqualToString:@".."]) break;
+            current = [current stringByAppendingPathComponent:component];
+            [_paths addObject:current]; [_titles addObject:component];
+        }
+    }
+    return self;
+}
+
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];

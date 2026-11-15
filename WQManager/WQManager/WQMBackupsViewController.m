@@ -1,3 +1,4 @@
+#import "WQMFilesViewController.h"
 #import "WQMBackupsViewController.h"
 #import "WQMBackupArchiveService.h"
 #import "WQMAppModel.h"
@@ -183,13 +184,14 @@ static NSString *WQMBackupReasonText(NSString *reason)
     formatter.timeStyle = NSDateFormatterShortStyle;
     UIListContentConfiguration *configuration = (UIListContentConfiguration *)self.listContentView.configuration;
     NSString *reason = WQMBackupReasonText(backup.reason);
-    configuration.text = reason.length ? reason : backup.scopeName;
+    configuration.text = backup.note.length ? backup.note : (reason.length ? reason : backup.scopeName);
     NSString *symbol = @"externaldrive.fill";
     if ([reason isEqualToString:WQML(@"RESTORE_SAFETY_REASON", @"恢复前自动安全备份")]) {
         symbol = @"shield.fill";
     } else if ([backup.scopeCode isEqualToString:@"quick"]) {
         symbol = @"bolt.fill";
     }
+    if (backup.protectedBackup) symbol = @"lock.shield.fill";
     configuration.image = [UIImage systemImageNamed:symbol];
     NSString *sizeText = backup.totalBytes
         ? WQMFormatBytes(backup.totalBytes)
@@ -200,6 +202,7 @@ static NSString *WQMBackupReasonText(NSString *reason)
                                    backup.scopeName.length && !reason.length
                                        ? [NSString stringWithFormat:@" · %@", backup.scopeName]
                                        : @""];
+    if (backup.protectedBackup) configuration.secondaryText = [configuration.secondaryText stringByAppendingFormat:@" · %@", WQML(@"BACKUP_PROTECTED", @"重要备份已保护")];
     configuration.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
     configuration.textProperties.color = WQMTheme.textPrimaryColor;
     configuration.secondaryTextProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
@@ -649,13 +652,70 @@ static void WQMRemoveSharedImportSource(NSURL *url)
                                             handler:^(__unused UIAlertAction *action) {
         [self showDetailsForBackup:backup];
     }]];
-    [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"DELETE_BACKUP", @"删除备份") style:UIAlertActionStyleDestructive
-                                            handler:^(__unused UIAlertAction *action) {
-        [self confirmDeleteBackup:backup];
+    [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"BACKUP_BROWSE", @"浏览备份内容") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [self.navigationController pushViewController:[[WQMFilesViewController alloc] initWithBackup:backup] animated:YES];
     }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"BACKUP_COMPARE", @"备份对比") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { [self chooseComparisonForBackup:backup]; }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"BACKUP_EDIT_NOTE", @"编辑备注") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { [self editNoteForBackup:backup]; }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:backup.protectedBackup ? WQML(@"BACKUP_UNPROTECT", @"取消重要备份保护") : WQML(@"BACKUP_PROTECT", @"保护重要备份") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [self updateMetadataForBackup:backup note:backup.note protected:!backup.protectedBackup];
+    }]];
+    if (!backup.protectedBackup) [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"DELETE_BACKUP", @"删除备份") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) { [self confirmDeleteBackup:backup]; }]];
     [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"CANCEL", @"取消") style:UIAlertActionStyleCancel handler:nil]];
     sheet.popoverPresentationController.sourceView = tableView;
     sheet.popoverPresentationController.sourceRect = [tableView rectForRowAtIndexPath:indexPath];
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)editNoteForBackup:(WQMBackupRecord *)backup
+{
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_EDIT_NOTE", @"编辑备注") message:WQML(@"BACKUP_NOTE_LIMIT", @"最多 300 字。备注随备份包导出；保护状态也会保留。") preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) { field.text = backup.note; field.placeholder = WQML(@"BACKUP_NOTE_PLACEHOLDER", @"例如：更新前、通关存档"); }];
+    [alert addAction:[UIAlertAction actionWithTitle:WQML(@"CANCEL", @"取消") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:WQML(@"SAVE", @"保存") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [self updateMetadataForBackup:backup note:alert.textFields.firstObject.text ?: @"" protected:backup.protectedBackup];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)updateMetadataForBackup:(WQMBackupRecord *)backup note:(NSString *)note protected:(BOOL)protectedBackup
+{
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"BACKUP_METADATA_SAVING", @"保存备份信息") status:nil cancelHandler:nil]) return;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSError *error = nil;
+        BOOL saved = [WQMBackupStore updateBackup:backup note:note protected:protectedBackup error:&error];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [WQMLongOperationBanner.shared hideWithCompletion:^{
+                if (!saved) [WQMAlertPresenter presentAlertWithTitle:WQML(@"BACKUP_METADATA_FAILED", @"保存失败") message:error.localizedDescription];
+                [self reloadBackups];
+            }];
+        });
+    });
+}
+
+- (void)chooseComparisonForBackup:(WQMBackupRecord *)backup
+{
+    NSMutableArray *candidates = [NSMutableArray new];
+    for (WQMBackupRecord *other in _backups) {
+        if ([other.path isEqual:backup.path] || ![other.bundleIdentifier isEqual:backup.bundleIdentifier] || ![other.requestedParts isEqualToArray:backup.requestedParts]) continue;
+        [candidates addObject:other];
+    }
+    if (!candidates.count) {
+        [WQMAlertPresenter presentAlertWithTitle:WQML(@"BACKUP_COMPARE", @"备份对比") message:WQML(@"BACKUP_COMPARE_NEEDS_PAIR", @"需要同一 App、相同目录范围的另一份备份。这样新增和删除才有可比性。")];
+        return;
+    }
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_COMPARE_PICK", @"选择另一份备份") message:WQML(@"BACKUP_COMPARE_PICK_HINT", @"列出最近 30 份相同范围的备份。") preferredStyle:UIAlertControllerStyleActionSheet];
+    for (WQMBackupRecord *other in [candidates subarrayWithRange:NSMakeRange(0, MIN(candidates.count, 30))]) {
+        NSString *date = [NSDateFormatter localizedStringFromDate:other.createdAt dateStyle:NSDateFormatterMediumStyle timeStyle:NSDateFormatterShortStyle];
+        NSString *name = other.note.length ? [NSString stringWithFormat:@"%@ · %@", other.note, date] : date;
+        [sheet addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            BOOL selectedOlder = [backup.createdAt compare:other.createdAt] != NSOrderedDescending;
+            [self.navigationController pushViewController:[[WQMFilesViewController alloc] initComparingOlder:selectedOlder ? backup : other newer:selectedOlder ? other : backup] animated:YES];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"CANCEL", @"取消") style:UIAlertActionStyleCancel handler:nil]];
+    sheet.popoverPresentationController.sourceView = self.view;
+    sheet.popoverPresentationController.sourceRect = self.view.bounds;
     [self presentViewController:sheet animated:YES completion:nil];
 }
 
@@ -671,6 +731,7 @@ static void WQMRemoveSharedImportSource(NSURL *url)
                          [backup.parts componentsJoinedByString:@", "],
                          backup.systemVersion,
                          backup.path];
+    message = [message stringByAppendingFormat:@"\n\n%@\n%@", backup.note, backup.protectedBackup ? WQML(@"BACKUP_PROTECTED", @"重要备份已保护") : @""];
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_DETAILS_TITLE", @"备份详情")
                                                                    message:message
                                                             preferredStyle:UIAlertControllerStyleAlert];
@@ -718,6 +779,10 @@ static void WQMRemoveSharedImportSource(NSURL *url)
 
 - (void)confirmDeleteBackup:(WQMBackupRecord *)backup
 {
+    if (backup.protectedBackup) {
+        [WQMAlertPresenter presentAlertWithTitle:WQML(@"BACKUP_PROTECTED", @"重要备份已保护") message:WQML(@"BACKUP_PROTECTED_DELETE", @"请先取消重要备份保护，再删除这份备份。")];
+        return;
+    }
     _deleteGate = [WQMConfirmationGate new];
     NSString *operation = [@"delete-backup:" stringByAppendingString:backup.path];
     if (![_deleteGate beginForOperation:operation]) return;
