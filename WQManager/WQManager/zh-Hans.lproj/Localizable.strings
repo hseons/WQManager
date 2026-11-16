@@ -129,6 +129,7 @@
 "APP_INDEX_REFRESH_FAILED" = "刷新失败，继续显示上次索引";
 "APP_INDEX_UPDATED" = "App 索引 · %@更新";
 "APP_INDEX_UPDATE_CANCELLED" = "更新已取消，继续显示缓存索引";
+"APP_INDEX_STALE_HINT_FORMAT" = "%@ · 下拉可重试";
 "APP_SEARCH_COUNT" = "%lu / %lu 个 App";
 "ARCHIVE_DELETED" = "备份已删除";
 "ARCHIVE_DELETE_FAILED" = "删除备份失败";
@@ -205,6 +206,7 @@
 "CLEAN_NEEDS_APP_SCAN" = "请先到“应用”页面完成一次 App 扫描";
 "CLEAN_NOT_ELIGIBLE" = "不可清理";
 "CLEAN_NO_ELIGIBLE_CACHES" = "没有可清理的 App 缓存";
+"CLEAN_EMPTY_RESCAN_HINT" = "点按此卡片可重新扫描";
 "CLEAN_PARTIALLY_LIMITED" = " · 部分项目受限";
 "CLEAN_PARTIAL_MESSAGE" = "部分缓存未能删除";
 "CLEAN_PROGRESS" = "正在清理 %lu/%lu：%@";
@@ -386,6 +388,8 @@
 "TIME_HOURS_AGO" = "%ld 小时前";
 "TIME_JUST_NOW" = "刚刚";
 "TIME_MINUTES_AGO" = "%ld 分钟前";
+"TIMESTAMP_TODAY_FORMAT" = "今天 %@";
+"TIMESTAMP_YESTERDAY_FORMAT" = "昨天 %@";
 "TODAY" = "今天";
 "UNDERSTOOD_CONTINUE" = "我已了解，继续";
 "UNKNOWN" = "未知";

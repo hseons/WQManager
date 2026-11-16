@@ -130,7 +130,10 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UISearchBar *searchBar;
 
-- (void)setApps:(NSArray<WQMAppModel *> *)apps status:(NSString *)status scanning:(BOOL)scanning;
+- (void)setApps:(NSArray<WQMAppModel *> *)apps
+         status:(NSString *)status
+       scanning:(BOOL)scanning
+          stale:(BOOL)stale;
 
 @end
 
@@ -219,7 +222,10 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     return self;
 }
 
-- (void)setApps:(NSArray<WQMAppModel *> *)apps status:(NSString *)status scanning:(BOOL)scanning
+- (void)setApps:(NSArray<WQMAppModel *> *)apps
+         status:(NSString *)status
+       scanning:(BOOL)scanning
+          stale:(BOOL)stale
 {
     unsigned long long total = 0;
     NSUInteger known = 0;
@@ -246,7 +252,13 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
             : (known > 0 ? sizeText : WQML(@"APP_SIZE_UNKNOWN_SHORT", @"容量未知"));
     }];
     [WQMTheme animateLabelChange:self.statusLabel update:^{
-        self.statusLabel.text = status ?: @"";
+        NSString *line = status ?: @"";
+        if (stale && line.length) {
+            line = [NSString stringWithFormat:WQML(@"APP_INDEX_STALE_HINT_FORMAT", @"%@ · 下拉可重试"), line];
+        }
+        self.statusLabel.text = line;
+        // 索引过期要让用户一眼看到（warningColor 与次要文字同色，这里改用危险色）。
+        self.statusLabel.textColor = stale ? WQMTheme.dangerColor : WQMTheme.textSecondaryColor;
     }];
     if (!_playedEntrance) {
         _playedEntrance = YES;
@@ -409,6 +421,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     NSArray<WQMAppModel *> *_visibleApps;
     NSString *_query;
     NSString *_status;
+    BOOL _statusStale;
     WQScanCancellation *_scanCancellation;
     WQMBackupQueueViewController *_batchController;
     NSUInteger _scanGeneration;
@@ -457,7 +470,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     _summaryView = [[WQMAppsSummaryView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 146)];
     _summaryView.searchBar.delegate = self;
     self.tableView.tableHeaderView = _summaryView;
-    [_summaryView setApps:@[] status:WQML(@"PREPARING_SCAN", @"准备扫描") scanning:YES];
+    [_summaryView setApps:@[] status:WQML(@"PREPARING_SCAN", @"准备扫描") scanning:YES stale:NO];
     UITapGestureRecognizer *dismissTap =
         [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard:)];
     dismissTap.cancelsTouchesInView = NO;
@@ -638,6 +651,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
                        WQML(@"APP_INDEX_LIMITED_SUFFIX", @"%@ · %lu 个受限"),
                        _status, (unsigned long)cache.limitedCount];
         }
+        _statusStale = NO;
         [self rebuildVisibleApps];
         [self updateSummary];
         [self.tableView reloadData];
@@ -679,8 +693,9 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     _status = _apps.count
         ? WQML(@"APP_INDEX_REFRESHING", @"正在后台更新 App 索引…")
         : WQML(@"SCANNING_APPS", @"正在查找 App…");
+    _statusStale = NO;
     [_animatedApps removeAllObjects];
-    [_summaryView setApps:_apps status:_status scanning:YES];
+    [_summaryView setApps:_apps status:_status scanning:YES stale:NO];
     [self.refreshControl beginRefreshing];
     if (!_apps.count) [self.tableView reloadData];
 
@@ -690,6 +705,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
         __strong typeof(weakSelf) self = weakSelf;
         if (!self || generation != self->_scanGeneration || cancellation.isCancelled) return;
         self->_status = status;
+        self->_statusStale = NO;
         [self updateSummary];
         [WQMLongOperationBanner.shared updateStatus:status];
     } partial:^(NSArray<WQMAppModel *> *apps) {
@@ -707,6 +723,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
         if (result.apps.count && !result.cancelled) {
             self->_apps = result.apps;
             self->_status = result.status;
+            self->_statusStale = NO;
             self->_cacheLoadedAt = NSDate.date;
             [self->_animatedApps removeAllObjects];
             dispatch_async(WQMIndexSaveQueue(), ^{ [WQMAppCache saveResult:result]; });
@@ -714,9 +731,11 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
             self->_status = result.cancelled
                 ? WQML(@"APP_INDEX_UPDATE_CANCELLED", @"更新已取消，继续显示缓存索引")
                 : WQML(@"APP_INDEX_REFRESH_FAILED", @"刷新失败，继续显示上次索引");
+            self->_statusStale = YES;
         } else {
             self->_apps = @[];
             self->_status = result.status;
+            self->_statusStale = NO;
         }
         [self rebuildVisibleApps];
         [self updateSummary];
@@ -781,7 +800,7 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
 
 - (void)updateSummary
 {
-    [_summaryView setApps:_apps status:_status scanning:_scanning];
+    [_summaryView setApps:_apps status:_status scanning:_scanning stale:_statusStale];
 }
 
 - (void)updateFilterButtons

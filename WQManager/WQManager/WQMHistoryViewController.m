@@ -61,6 +61,31 @@ static UIColor *WQMHistoryStatusTint(WQMOperationStatus status)
     }
 }
 
+// 记录页每次重排会配置几十个 cell，NSDateFormatter 创建代价很高，这里按语言缓存复用。
+static NSDateFormatter *WQMHistorySharedFormatter(NSDateFormatterStyle dateStyle, NSDateFormatterStyle timeStyle)
+{
+    static NSMutableDictionary<NSString *, NSDateFormatter *> *cache;
+    static NSString *cachedLocaleIdentifier;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ cache = [NSMutableDictionary new]; });
+    NSLocale *locale = [WQMLanguageManager sharedManager].locale;
+    NSString *localeIdentifier = locale.localeIdentifier ?: @"";
+    if (![cachedLocaleIdentifier isEqualToString:localeIdentifier]) {
+        [cache removeAllObjects];
+        cachedLocaleIdentifier = localeIdentifier;
+    }
+    NSString *key = [NSString stringWithFormat:@"%ld-%ld", (long)dateStyle, (long)timeStyle];
+    NSDateFormatter *formatter = cache[key];
+    if (!formatter) {
+        formatter = [NSDateFormatter new];
+        formatter.locale = locale;
+        formatter.dateStyle = dateStyle;
+        formatter.timeStyle = timeStyle;
+        cache[key] = formatter;
+    }
+    return formatter;
+}
+
 @interface WQMStatusBadgeView : UIView
 - (void)configureWithText:(NSString *)text tint:(UIColor *)tint;
 @end
@@ -83,6 +108,15 @@ static UIColor *WQMHistoryStatusTint(WQMOperationStatus status)
                        scaledFontForFont:[UIFont systemFontOfSize:11 weight:UIFontWeightSemibold]];
         _label.adjustsFontForContentSizeCategory = YES;
         _label.textAlignment = NSTextAlignmentCenter;
+        _label.numberOfLines = 1;
+        _label.lineBreakMode = NSLineBreakByClipping;
+        // 徽标永远保持文字完整宽度：宁可让左侧文字换行/截断，也不能把状态压成一个字。
+        [_label setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                                forAxis:UILayoutConstraintAxisHorizontal];
+        [_label setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                                forAxis:UILayoutConstraintAxisVertical];
+        [_label setContentHuggingPriority:UILayoutPriorityRequired
+                                  forAxis:UILayoutConstraintAxisHorizontal];
         [self addSubview:_label];
         [NSLayoutConstraint activateConstraints:@[
             [_label.topAnchor constraintEqualToAnchor:self.topAnchor constant:3],
@@ -148,10 +182,16 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
         configuration.imageProperties.maximumSize = CGSizeMake(34, 34);
         configuration.imageProperties.reservedLayoutSize = CGSizeMake(34, 34);
         configuration.textProperties.numberOfLines = 2;
+        // 副标题最多两行，超出截断，避免长 scope 把行高撑到三四行。
+        configuration.secondaryTextProperties.numberOfLines = 2;
+        configuration.secondaryTextProperties.lineBreakMode = NSLineBreakByTruncatingTail;
         configuration.textToSecondaryTextVerticalPadding = 2;
         _listContentView = [[UIListContentView alloc] initWithConfiguration:configuration];
         _listContentView.translatesAutoresizingMaskIntoConstraints = NO;
         _listContentView.directionalLayoutMargins = NSDirectionalEdgeInsetsZero;
+        // 空间不够时优先压缩内容列（换行/截断），而不是把右侧状态徽标挤扁。
+        [_listContentView setContentCompressionResistancePriority:UILayoutPriorityDefaultLow
+                                                          forAxis:UILayoutConstraintAxisHorizontal];
         [_cardView addSubview:_listContentView];
 
         _chevronView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.down"]];
@@ -210,10 +250,7 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     NSString *status = [WQMOperationRecord displayNameForStatus:operation.status];
     configuration.text = [NSString stringWithFormat:@"%@ · %@", kind, operation.appName];
 
-    NSDateFormatter *formatter = [NSDateFormatter new];
-    formatter.locale = [WQMLanguageManager sharedManager].locale;
-    formatter.dateStyle = NSDateFormatterNoStyle;
-    formatter.timeStyle = NSDateFormatterShortStyle;
+    NSDateFormatter *formatter = WQMHistorySharedFormatter(NSDateFormatterNoStyle, NSDateFormatterShortStyle);
     NSMutableArray<NSString *> *details = [NSMutableArray new];
     if (operation.scope.length) [details addObject:WQMHistoryLocalizedScope(operation.scope)];
     [details addObject:[formatter stringFromDate:operation.startedAt]];
@@ -268,10 +305,7 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
     NSString *kindName = [WQMOperationRecord displayNameForKind:kind];
     configuration.text = [NSString stringWithFormat:WQML(@"HISTORY_GROUP_TITLE", @"%@ · %lu 次"),
                           kindName, (unsigned long)count];
-    NSDateFormatter *formatter = [NSDateFormatter new];
-    formatter.locale = [WQMLanguageManager sharedManager].locale;
-    formatter.dateStyle = NSDateFormatterNoStyle;
-    formatter.timeStyle = NSDateFormatterShortStyle;
+    NSDateFormatter *formatter = WQMHistorySharedFormatter(NSDateFormatterNoStyle, NSDateFormatterShortStyle);
     NSString *latestText = [formatter stringFromDate:latest];
     configuration.secondaryText = (bytes > 0)
         ? [NSString stringWithFormat:WQML(@"HISTORY_GROUP_SUMMARY", @"共 %@ · 最近 %@"),
@@ -640,10 +674,8 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
         if ([calendar isDateInToday:day]) title = WQML(@"TODAY", @"今天");
         else if ([calendar isDateInYesterday:day]) title = WQML(@"YESTERDAY", @"昨天");
         else {
-            NSDateFormatter *formatter = [NSDateFormatter new];
-            formatter.locale = [WQMLanguageManager sharedManager].locale;
-            formatter.dateStyle = NSDateFormatterMediumStyle;
-            formatter.timeStyle = NSDateFormatterNoStyle;
+            NSDateFormatter *formatter =
+                WQMHistorySharedFormatter(NSDateFormatterMediumStyle, NSDateFormatterNoStyle);
             title = [formatter stringFromDate:day];
         }
 

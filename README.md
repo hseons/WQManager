@@ -156,6 +156,18 @@ Everything is local. No account, no analytics, no cloud.
   backgrounding pauses subsequent jobs. Saved pending/interrupted jobs can be
   resumed explicitly after reopening, using refreshed container identities.
 
+### History badges and empty states (0.4, build 16)
+
+- History status badges keep their full width; when space is tight the secondary
+  line wraps or truncates instead, so 成功/已回滚 are never clipped to one character.
+  Secondary text is limited to two lines.
+- A stale app index now shows "· 下拉可重试" in the warning colour, so a failed
+  refresh no longer looks like a neutral caption.
+- 清理 hides the selection count and quick filters when nothing is eligible, and
+  tapping the empty card starts a new scan.
+- Backup rows read 今天/昨天/date plus the time, which makes several backups of the
+  same app easier to tell apart.
+
 ### Performance and inspection (0.4, build 15)
 
 - App scans publish results progressively; App actions → Refresh this app updates

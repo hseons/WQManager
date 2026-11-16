@@ -20,6 +20,77 @@ static NSString *WQMBackupReasonText(NSString *reason)
     return reason;
 }
 
+// 备份行会反复配置，NSDateFormatter 按语言缓存复用；时间按「今天 / 昨天 / 日期」自动降级，
+// 这样同一 App 的多份备份一眼就能看出先后，也不会顶满整行。
+static NSDateFormatter *WQMBackupSharedFormatter(NSDateFormatterStyle dateStyle, NSDateFormatterStyle timeStyle)
+{
+    static NSMutableDictionary<NSString *, NSDateFormatter *> *cache;
+    static NSString *cachedLocaleIdentifier;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ cache = [NSMutableDictionary new]; });
+    NSLocale *locale = [WQMLanguageManager sharedManager].locale;
+    NSString *localeIdentifier = locale.localeIdentifier ?: @"";
+    if (![cachedLocaleIdentifier isEqualToString:localeIdentifier]) {
+        [cache removeAllObjects];
+        cachedLocaleIdentifier = localeIdentifier;
+    }
+    NSString *key = [NSString stringWithFormat:@"%ld-%ld", (long)dateStyle, (long)timeStyle];
+    NSDateFormatter *formatter = cache[key];
+    if (!formatter) {
+        formatter = [NSDateFormatter new];
+        formatter.locale = locale;
+        formatter.dateStyle = dateStyle;
+        formatter.timeStyle = timeStyle;
+        cache[key] = formatter;
+    }
+    return formatter;
+}
+
+static NSString *WQMBackupDateText(NSDate *date, NSString *template);
+
+static NSString *WQMBackupTimestampText(NSDate *date)
+{
+    if (!date) return @"";
+    NSCalendar *calendar = NSCalendar.currentCalendar;
+    NSDateFormatter *timeFormatter = WQMBackupSharedFormatter(NSDateFormatterNoStyle,
+                                                              NSDateFormatterShortStyle);
+    NSString *timeText = [timeFormatter stringFromDate:date];
+    if ([calendar isDateInToday:date]) {
+        return [NSString stringWithFormat:WQML(@"TIMESTAMP_TODAY_FORMAT", @"今天 %@"), timeText];
+    }
+    if ([calendar isDateInYesterday:date]) {
+        return [NSString stringWithFormat:WQML(@"TIMESTAMP_YESTERDAY_FORMAT", @"昨天 %@"), timeText];
+    }
+    BOOL sameYear = [calendar component:NSCalendarUnitYear fromDate:date] ==
+                    [calendar component:NSCalendarUnitYear fromDate:NSDate.date];
+    NSString *dateText = WQMBackupDateText(date, sameYear ? @"MMMd" : @"yMMMd");
+    return [NSString stringWithFormat:@"%@ %@", dateText, timeText];
+}
+
+// 按本地化模板生成日期串（中文「11月15日」、英文「Nov 15」），同样按语言缓存。
+static NSString *WQMBackupDateText(NSDate *date, NSString *template)
+{
+    static NSMutableDictionary<NSString *, NSDateFormatter *> *cache;
+    static NSString *cachedLocaleIdentifier;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ cache = [NSMutableDictionary new]; });
+    NSLocale *locale = [WQMLanguageManager sharedManager].locale;
+    NSString *localeIdentifier = locale.localeIdentifier ?: @"";
+    if (![cachedLocaleIdentifier isEqualToString:localeIdentifier]) {
+        [cache removeAllObjects];
+        cachedLocaleIdentifier = localeIdentifier;
+    }
+    NSString *key = [NSString stringWithFormat:@"%@|%@", localeIdentifier, template];
+    NSDateFormatter *formatter = cache[key];
+    if (!formatter) {
+        formatter = [NSDateFormatter new];
+        formatter.locale = locale;
+        [formatter setLocalizedDateFormatFromTemplate:template];
+        cache[key] = formatter;
+    }
+    return [formatter stringFromDate:date];
+}
+
 @interface WQMBackupsSummaryView : UIView
 @property (nonatomic, strong) UILabel *valueLabel;
 @property (nonatomic, strong) UILabel *detailLabel;
@@ -178,10 +249,6 @@ static NSString *WQMBackupReasonText(NSString *reason)
 
 - (void)configureWithBackup:(WQMBackupRecord *)backup
 {
-    NSDateFormatter *formatter = [NSDateFormatter new];
-    formatter.locale = [WQMLanguageManager sharedManager].locale;
-    formatter.dateStyle = NSDateFormatterMediumStyle;
-    formatter.timeStyle = NSDateFormatterShortStyle;
     UIListContentConfiguration *configuration = (UIListContentConfiguration *)self.listContentView.configuration;
     NSString *reason = WQMBackupReasonText(backup.reason);
     configuration.text = backup.note.length ? backup.note : (reason.length ? reason : backup.scopeName);
@@ -197,7 +264,7 @@ static NSString *WQMBackupReasonText(NSString *reason)
         ? WQMFormatBytes(backup.totalBytes)
         : WQML(@"BACKUP_SIZE_PENDING", @"大小待统计");
     configuration.secondaryText = [NSString stringWithFormat:@"%@ · %@%@",
-                                   [formatter stringFromDate:backup.createdAt],
+                                   WQMBackupTimestampText(backup.createdAt),
                                    sizeText,
                                    backup.scopeName.length && !reason.length
                                        ? [NSString stringWithFormat:@" · %@", backup.scopeName]

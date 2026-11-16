@@ -140,6 +140,8 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
     UIButton *_selectAllButton;
     UIButton *_largeCachesButton;
     UIButton *_clearSelectionButton;
+    UIStackView *_mainStack;
+    UIStackView *_quickActions;
     BOOL _playedEntrance;
 }
 
@@ -178,6 +180,7 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
         UIStackView *quickActions = [[UIStackView alloc] initWithArrangedSubviews:@[
             _selectAllButton, _largeCachesButton, _clearSelectionButton
         ]];
+        _quickActions = quickActions;
         quickActions.axis = UILayoutConstraintAxisHorizontal;
         quickActions.distribution = UIStackViewDistributionFillEqually;
         quickActions.alignment = UIStackViewAlignmentCenter;
@@ -194,6 +197,7 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
         top.spacing = 18;
 
         UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[top, quickActions]];
+        _mainStack = stack;
         stack.axis = UILayoutConstraintAxisVertical;
         stack.spacing = 14;
         stack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -362,6 +366,8 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
     [_progressView setProgress:allBytes ? (CGFloat)total / (CGFloat)allBytes : 0 animated:YES];
     NSUInteger selected = 0;
     for (WQMCleanItem *item in items) if (item.selected) selected++;
+    // 没有可清理对象时，「已选择 0 个 App」是纯噪音，直接收起。
+    _selectedLabel.hidden = items.count == 0;
     [WQMTheme animateLabelChange:self.selectedLabel update:^{
         self.selectedLabel.text = [NSString stringWithFormat:
                                    WQML(@"CLEAN_SELECTED_COUNT", @"已选择 %lu 个 App"),
@@ -403,6 +409,12 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
     _selectAllButton.enabled = interactive && eligibleCount > 0;
     _largeCachesButton.enabled = interactive && largeEligibleCount > 0;
     _clearSelectionButton.enabled = interactive && selectedCount > 0;
+    // 没有任何可清理对象时，三个快捷筛选全是禁用噪音，整行收起。
+    if (eligibleCount == 0) {
+        if (_quickActions.superview) [_quickActions removeFromSuperview];
+    } else if (!_quickActions.superview && _mainStack) {
+        [_mainStack addArrangedSubview:_quickActions];
+    }
     [_selectAllButton setNeedsUpdateConfiguration];
     [_largeCachesButton setNeedsUpdateConfiguration];
     [_clearSelectionButton setNeedsUpdateConfiguration];
@@ -994,8 +1006,10 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
         ? WQML(@"CLEAN_SCANNING_CACHES", @"正在扫描缓存")
         : WQML(@"CLEAN_NO_ELIGIBLE_CACHES", @"没有可清理的 App 缓存");
     _titleLabel.textColor = WQMTheme.textPrimaryColor;
-    _subtitleLabel.text = status;
-    _subtitleLabel.hidden = status.length == 0;
+    _subtitleLabel.text = scanning
+        ? status
+        : WQML(@"CLEAN_EMPTY_RESCAN_HINT", @"点按此卡片可重新扫描");
+    _subtitleLabel.hidden = _subtitleLabel.text.length == 0;
     _iconView.contentMode = UIViewContentModeScaleAspectFit;
     _iconView.backgroundColor = UIColor.clearColor;
     _iconView.tintColor = scanning ? WQMTheme.textPrimaryColor : WQMTheme.textSecondaryColor;
@@ -1356,6 +1370,10 @@ typedef NS_ENUM(NSInteger, WQMCleanerQuickAction) {
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (_items.count == 0) {
+        if (!_scanning && !_cleaning) [self scan];
+        return;
+    }
     if (_scanning || _cleaning || indexPath.row >= (NSInteger)_items.count) return;
     WQMCleanItem *item = _items[(NSUInteger)indexPath.row];
     if (!item.eligible) {

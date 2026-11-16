@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.4.4] — 2026-11-16
+
+The app and share extension display version **0.4**, build **16**. The internal
+release revision and Git tag are 0.4.4 / v0.4.4.
+
+### Fixed
+
+- History rows no longer squeeze the status badge: the badge keeps its intrinsic
+  width and the secondary line yields instead, so states such as 成功/已回滚 stay
+  readable at every text size. Secondary text is capped at two lines.
+- The stale-index notice on 应用 now reads "… · 下拉可重试" and uses the warning
+  colour, so a failed refresh is visible instead of a neutral caption.
+
+### Changed
+
+- 清理 hides the selection count and the quick-filter row when nothing is
+  eligible, and the empty card can be tapped to scan again.
+- 备份 timestamps read 今天/昨天/日期 plus the time, making backups of the same app
+  easier to tell apart.
+- Date formatters are cached per locale instead of being rebuilt for every row in
+  记录 and 备份.
+
 ## [0.4.3] — 2026-11-16
 
 The app and share extension display version **0.4**, build **15**. The internal

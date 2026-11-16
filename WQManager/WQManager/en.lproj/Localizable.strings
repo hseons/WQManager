@@ -129,6 +129,7 @@
 "APP_INDEX_REFRESH_FAILED" = "Refresh failed; showing the previous index";
 "APP_INDEX_UPDATED" = "App Index · Updated %@";
 "APP_INDEX_UPDATE_CANCELLED" = "Update cancelled; showing the cached index";
+"APP_INDEX_STALE_HINT_FORMAT" = "%@ · Pull to retry";
 "APP_SEARCH_COUNT" = "%lu / %lu Apps";
 "ARCHIVE_DELETED" = "Backup deleted";
 "ARCHIVE_DELETE_FAILED" = "Could not delete backup";
@@ -205,6 +206,7 @@
 "CLEAN_NEEDS_APP_SCAN" = "Open the Apps screen and complete an app scan first";
 "CLEAN_NOT_ELIGIBLE" = "Cannot Clean";
 "CLEAN_NO_ELIGIBLE_CACHES" = "No app caches are available to clean";
+"CLEAN_EMPTY_RESCAN_HINT" = "Tap this card to scan again";
 "CLEAN_PARTIALLY_LIMITED" = " · Some items are restricted";
 "CLEAN_PARTIAL_MESSAGE" = "Some caches could not be deleted";
 "CLEAN_PROGRESS" = "Cleaning %lu/%lu: %@";
@@ -386,6 +388,8 @@
 "TIME_HOURS_AGO" = "%ld hours ago";
 "TIME_JUST_NOW" = "just now";
 "TIME_MINUTES_AGO" = "%ld min ago";
+"TIMESTAMP_TODAY_FORMAT" = "Today %@";
+"TIMESTAMP_YESTERDAY_FORMAT" = "Yesterday %@";
 "TODAY" = "Today";
 "UNDERSTOOD_CONTINUE" = "I Understand, Continue";
 "UNKNOWN" = "Unknown";

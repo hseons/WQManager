@@ -19,6 +19,7 @@ TestResults/
 dist/
 *.ipa
 *.dSYM/
+.dsh-tmp/
 
 # macOS
 .DS_Store
