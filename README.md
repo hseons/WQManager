@@ -157,6 +157,27 @@ Everything is local. No account, no analytics, no cloud.
 
 See [the next WQ capability plan](docs/NEXT_STEPS_WQ.md) for future research.
 
+### Access diagnostics (0.4, build 14)
+
+Settings → Access capabilities shows runtime App Group signing evidence, the
+device and exact OS build. Choose one app from the existing index to check the
+token stage, container identity, directory opens/listings and file-read samples.
+Failures suggest refreshing the index, preserving App Groups when re-signing,
+or exporting a report for investigation.
+
+Each directory checks at most 64 direct entries. Documents, Library and tmp
+each attempt a read of up to one byte from one regular file. Empty directories
+leave file reads untested; successful samples do not establish full-container
+access. Shared App Groups, extensions, system containers and writes remain
+untested. The existing WQ grant flow temporarily uses the tool's own App Group
+cache; diagnostics do not write to the target app or start a full-disk scan.
+
+The share button exports a local JSON report with environment evidence, failure
+stages and numeric error codes, excluding app names, bundle IDs, paths, tokens,
+raw logs and file contents. Simulator and synthetic samples are explicitly
+marked. The displayed version stays 0.4 with an increasing build number; release
+revisions remain available for tags and update checks.
+
 ## Icons on stock iOS
 
 iOS does not let an unentitled third-party app ask IconServices for another

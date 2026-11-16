@@ -7,6 +7,12 @@ OUTPUT_DIR="${TMPDIR:-/tmp}/wqmanager-tests"
 
 mkdir -p "$OUTPUT_DIR"
 
+clang -fobjc-arc -fblocks -I"$SOURCE_DIR" -framework Foundation \
+  "$SOURCE_DIR/WQMLanguageManager.m" "$SOURCE_DIR/WQMAppModel.m" \
+  "$SOURCE_DIR/WQMBackupSelection.m" "$SOURCE_DIR/WQMAccessDiagnostics.m" \
+  "$ROOT/tests/WQMAccessDiagnosticsTests.m" -o "$OUTPUT_DIR/WQMAccessDiagnosticsTests"
+"$OUTPUT_DIR/WQMAccessDiagnosticsTests"
+
 clang \
   -fobjc-arc \
   -fblocks \

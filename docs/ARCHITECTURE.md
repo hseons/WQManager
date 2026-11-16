@@ -72,6 +72,35 @@ them when evicted. A token is considered invalid only when an open fails with
 `EPERM`; `EACCES` is treated as a normal permission error and not retried
 forever.
 
+### Access diagnostics
+
+Settings exposes an on-demand access diagnostic for one indexed app data
+container. `WQMAccessDiagnostics` receives the existing grant and label helpers
+through blocks so its descriptor-based reads can be tested against local
+fixtures. `wq_grant_with_diagnostics` uses the same acquisition path as
+`wq_grant`, additionally reporting stable failure stages without returning a
+token. A cached grant is verified independently by opening a real directory.
+The current device/inode and bundle label must match before child reads.
+
+Directory samples are nonrecursive and stop at 64 direct entries. Each of
+Documents, Library and tmp attempts a read of at most one byte from one regular
+file. Links are not followed; absent samples remain untested. The normal WQ
+grant can temporarily swap the tool-owned App Group cache, but diagnostics
+never write into the target container. The global operation banner serializes
+the user-requested check with backup/restore/cleanup operations.
+
+Reports use an explicit JSON schema containing environment evidence and fixed
+stage/reason codes. App identifiers, paths, names, raw logs, tokens and read
+bytes are never added. Reports are generated only on export and their temporary
+file is removed after the share sheet finishes. Other container categories and
+write capability are explicitly untested. Simulator fixtures are marked as
+synthetic and do not establish device compatibility.
+
+The visible app/extension version remains 0.4, with an increasing build number.
+`WQMReleaseVersion` is the internal release revision used by update detection
+and matches the Git tag, avoiding repeated update prompts from comparing 0.4
+against older 0.4.x releases.
+
 ### Identity checks
 
 Every destructive operation re-verifies, immediately before deletion:

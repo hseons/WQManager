@@ -23,6 +23,12 @@ NSString *_Nullable wq_app_group(void);
 // Asks for a sandbox extension covering path (once per path). Returns YES
 // when one is held for it.
 BOOL wq_grant(NSString *path);
+// Same acquisition path, with a stable failure stage for user-requested diagnostics.
+// 0 success; -1 App Group; -2 API; -3 query; -4 preparation/busy;
+// -5 result; -6 token; -7 consume; -8 recovery; -9 exception;
+// -10 token did not open target; -11 target metadata. No token is returned.
+BOOL wq_grant_with_diagnostics(NSString *path, NSInteger *_Nullable failureCode,
+                                int *_Nullable systemError);
 /// Release the token for a path once it is no longer needed. Keeps the
 /// process well below the kernel extension limit during long scans.
 void wq_drop_grant(NSString *path);

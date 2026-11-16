@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.4.2] — 2026-11-16
+
+The app and share extension display version **0.4**, build **14**. The release
+revision remains 0.4.2 for tags and update detection.
+
+### Added
+
+- Settings → Access capabilities: runtime signing evidence, usable App Group,
+  exact OS build, device/simulator environment and protected-data availability.
+- On-demand checks of one indexed app: token failure stage, current container
+  identity, directory open/list results and bounded file-read samples for
+  Documents, Library and tmp. Results include actionable failure explanations.
+- User-initiated redacted JSON reports without app names, bundle IDs, paths,
+  tokens, raw logs or file contents. Untested categories and write access remain
+  explicit; no full-disk scan or target mutation is used for diagnostics.
+
+### Changed
+
+- Keep the visible version at 0.4 while increasing the build number. Compare
+  the internal release revision when checking for updates.
+
 ## [0.4.1] — 2026-11-16
 
 ### Fixed

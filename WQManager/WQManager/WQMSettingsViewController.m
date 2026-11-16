@@ -16,6 +16,7 @@
 #import "WQMBackupStore.h"
 #import "WQMStorageService.h"
 #import "WQMRestoreService.h"
+#import "WQMAccessViewController.h"
 
 static NSString *WQMBackupRetentionName(NSInteger limit)
 {
@@ -254,7 +255,7 @@ static NSString *WQMTrashBytesText(unsigned long long bytes)
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    if (section == 0) return 4;
+    if (section == 0) return 5;
     if (section == 1) return 8;
     if (section == 2) return 4;
     return 2;
@@ -285,6 +286,7 @@ static NSString *WQMTrashBytesText(unsigned long long bytes)
     cell.backgroundColor = WQMTheme.surfaceColor;
     cell.accessoryType = UITableViewCellAccessoryNone;
     cell.accessoryView = nil;
+    cell.accessibilityIdentifier = nil;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
 
     if (indexPath.section == 0 && indexPath.row == 0) {
@@ -309,6 +311,12 @@ static NSString *WQMTrashBytesText(unsigned long long bytes)
         content.image = [UIImage systemImageNamed:
                          _hasAppGroup ? @"checkmark.seal.fill" : @"exclamationmark.triangle.fill"];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    } else if (indexPath.section == 0 && indexPath.row == 4) {
+        content.text = WQML(@"ACCESS_TITLE", @"访问能力");
+        content.secondaryText = WQML(@"ACCESS_SETTINGS_SUB", @"检查受限原因与导出脱敏报告");
+        content.image = [UIImage systemImageNamed:@"stethoscope"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.accessibilityIdentifier = @"settings.access";
     } else if (indexPath.section == 1 && indexPath.row == 0) {
         content.text = WQML(@"APP_INDEX", @"App 索引");
         content.secondaryText = _indexText;
@@ -407,6 +415,10 @@ static NSString *WQMTrashBytesText(unsigned long long bytes)
     }
     if (indexPath.section == 0 && indexPath.row == 2) {
         [self checkForUpdatesFromCell:[tableView cellForRowAtIndexPath:indexPath]];
+        return;
+    }
+    if (indexPath.section == 0 && indexPath.row == 4) {
+        [self.navigationController pushViewController:[WQMAccessViewController new] animated:YES];
         return;
     }
     if (indexPath.section == 1 && indexPath.row == 3) {
@@ -530,7 +542,9 @@ static NSString *WQMTrashBytesText(unsigned long long bytes)
                                                  url:nil];
                 return;
             }
-            if ([strongSelf versionTag:tag isNewerThan:strongSelf->_versionText]) {
+            // The visible version stays 0.4; release revisions keep update detection monotonic.
+            NSString *releaseVersion = NSBundle.mainBundle.infoDictionary[@"WQMReleaseVersion"] ?: strongSelf->_versionText;
+            if ([strongSelf versionTag:tag isNewerThan:releaseVersion]) {
                 [strongSelf showUpdateAlertWithTitle:
                     [NSString stringWithFormat:WQML(@"UPDATE_AVAILABLE_TITLE", @"发现新版本 %@"), tag]
                                              message:[NSString stringWithFormat:

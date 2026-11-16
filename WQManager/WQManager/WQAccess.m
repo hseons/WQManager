@@ -280,6 +280,13 @@ static BOOL wq_grant_opens(NSString *path)
 
 BOOL wq_grant(NSString *path)
 {
+    return wq_grant_with_diagnostics(path, NULL, NULL);
+}
+
+BOOL wq_grant_with_diagnostics(NSString *path, NSInteger *failureCode, int *systemError)
+{
+    if (failureCode) *failureCode = 0;
+    if (systemError) *systemError = 0;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         gGrants = [NSMutableDictionary new];
@@ -303,6 +310,8 @@ BOOL wq_grant(NSString *path)
     }
     struct stat st;
     if (lstat(key.fileSystemRepresentation, &st) != 0) {
+        if (failureCode) *failureCode = -11;
+        if (systemError) *systemError = errno;
         [gGrantLock unlock];
         return NO;  // worse_query needs an existing target
     }
@@ -323,17 +332,20 @@ BOOL wq_grant(NSString *path)
                    altFirst ? @"alternative" : @"standard");
         }
         wq_release_handle(handle);
-        handle = -8;
+        handle = -10;
     }
     if (handle < 0 && handle != -1 && handle != -2) {
         int64_t alt = wq_query(key, !altFirst);
         if (alt >= 0 && !wq_grant_opens(key)) {
             wq_release_handle(alt);
-            alt = -8;
+            alt = -10;
         }
         if (alt >= 0) {
             handle = alt;
             usedAlt = !altFirst;
+        } else {
+            // Diagnostics report the last attempted query's failure stage.
+            handle = alt;
         }
     }
     // Decided once, by the first grant that works: some targets refuse to
@@ -348,6 +360,8 @@ BOOL wq_grant(NSString *path)
         gGrants[key] = @(handle);
         [gGrantOrder addObject:key];
     }
+    if (handle < 0 && failureCode) *failureCode = (NSInteger)handle;
+    if (handle == -10 && systemError) *systemError = EPERM;
     [gGrantLock unlock];
     return handle >= 0;
 }
