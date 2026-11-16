@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 // Portable, side-effect-free validation shared by the Apps implementation and
 // its macOS fixture tests. Filesystem agreement is checked by WQApps.m.
 // A backup or restore refuses to start when the volume is nearly full. The
@@ -17,7 +19,7 @@
 // predictor of the bytes actually consumed.
 #define WQM_MIN_FREE_SPACE (256ULL * 1024ULL * 1024ULL)
 
-static inline unsigned long long WQMAppsSupportVolumeAvailableBytes(NSString *path)
+static inline unsigned long long WQMAppsSupportVolumeAvailableBytes(NSString * _Nullable path)
 {
     if (!path.length) return 0;
     NSURL *url = [NSURL fileURLWithPath:path isDirectory:YES];
@@ -35,7 +37,7 @@ static inline unsigned long long WQMAppsSupportVolumeAvailableBytes(NSString *pa
     return 0;
 }
 
-static inline unsigned long long WQMAppsSupportTreeSize(NSString *path)
+static inline unsigned long long WQMAppsSupportTreeSize(NSString * _Nullable path)
 {
     if (!path.length) return 0;
     NSFileManager *fm = NSFileManager.defaultManager;
@@ -57,13 +59,13 @@ static inline unsigned long long WQMAppsSupportTreeSize(NSString *path)
     return total;
 }
 
-static inline BOOL WQAppsSupportIsBool(id value)
+static inline BOOL WQAppsSupportIsBool(id _Nullable value)
 {
     return [value isKindOfClass:NSNumber.class] &&
            CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID();
 }
 
-static inline BOOL WQAppsSupportBundleIDValid(NSString *bundleID)
+static inline BOOL WQAppsSupportBundleIDValid(NSString * _Nullable bundleID)
 {
     if (![bundleID isKindOfClass:NSString.class] || bundleID.length < 3 || bundleID.length > 255) return NO;
     if ([bundleID hasPrefix:@"."] || [bundleID hasSuffix:@"."] || [bundleID containsString:@".."]) return NO;
@@ -76,7 +78,7 @@ static inline BOOL WQAppsSupportBundleIDValid(NSString *bundleID)
     return [bundleID containsString:@"."] && [bundleID rangeOfCharacterFromSet:bad].location == NSNotFound;
 }
 
-static inline BOOL WQAppsSupportIsInteger(id value)
+static inline BOOL WQAppsSupportIsInteger(id _Nullable value)
 {
     if (![value isKindOfClass:NSNumber.class]) return NO;
     if (CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID()) return NO;
@@ -88,14 +90,15 @@ static inline BOOL WQAppsSupportIsInteger(id value)
            strcmp(type, @encode(long long)) == 0 || strcmp(type, @encode(unsigned long long)) == 0;
 }
 
-static inline BOOL WQAppsSupportManifestFailure(NSString **errorOut, NSString *message)
+static inline BOOL WQAppsSupportManifestFailure(NSString * _Nullable * _Nullable errorOut, NSString *message)
 {
     if (errorOut) *errorOut = message;
     return NO;
 }
 
-static inline BOOL WQAppsSupportManifestFields(NSDictionary *manifest, NSString *bundleID,
-                                        NSArray<NSString *> **partsOut, NSString **errorOut)
+static inline BOOL WQAppsSupportManifestFields(NSDictionary * _Nullable manifest, NSString * _Nullable bundleID,
+                                        NSArray<NSString *> * _Nullable * _Nullable partsOut,
+                                        NSString * _Nullable * _Nullable errorOut)
 {
     if (![manifest isKindOfClass:NSDictionary.class]) {
         return WQAppsSupportManifestFailure(errorOut, @"The backup manifest is not a dictionary");
@@ -165,7 +168,7 @@ static inline void WQAppsSupportHashU64(CC_SHA256_CTX *ctx, uint64_t value)
     CC_SHA256_Update(ctx, bytes, (CC_LONG)sizeof(bytes));
 }
 
-static inline void WQAppsSupportHashBlob(CC_SHA256_CTX *ctx, const void *bytes, NSUInteger length)
+static inline void WQAppsSupportHashBlob(CC_SHA256_CTX *ctx, const void * _Nullable bytes, NSUInteger length)
 {
     WQAppsSupportHashU64(ctx, (uint64_t)length);
     if (length) CC_SHA256_Update(ctx, bytes, (CC_LONG)length);
@@ -175,8 +178,9 @@ static inline void WQAppsSupportHashBlob(CC_SHA256_CTX *ctx, const void *bytes, 
 // adds inode/mtime/ctime for source-stability checks; the shape variant omits
 // them and is suitable for comparing a source with its copy. A digest keeps
 // memory bounded and makes filenames containing delimiters unambiguous.
-static inline NSString *WQAppsSupportTreeSignature(NSString *path, BOOL includeIdentity,
-                                                   BOOL *exists, NSString **errorOut)
+static inline NSString * _Nullable WQAppsSupportTreeSignature(NSString *path, BOOL includeIdentity,
+                                                   BOOL * _Nullable exists,
+                                                   NSString * _Nullable * _Nullable errorOut)
 {
     struct stat rootStat;
     if (lstat(path.fileSystemRepresentation, &rootStat) != 0) {
@@ -255,9 +259,11 @@ static inline NSString *WQAppsSupportTreeSignature(NSString *path, BOOL includeI
 // WQAppsSupportTreeSignature(path, YES) and WQAppsSupportTreeSignature(path, NO)
 // back to back, and to summing WQMBackupTreeSize over the same tree. Callers
 // that need all three should use this instead of walking the tree repeatedly.
-static inline BOOL WQAppsSupportTreeDigests(NSString *path, BOOL *exists,
-                                            NSString **identityOut, NSString **shapeOut,
-                                            unsigned long long *totalBytesOut, NSString **errorOut)
+static inline BOOL WQAppsSupportTreeDigests(NSString *path, BOOL * _Nullable exists,
+                                            NSString * _Nullable * _Nullable identityOut,
+                                            NSString * _Nullable * _Nullable shapeOut,
+                                            unsigned long long * _Nullable totalBytesOut,
+                                            NSString * _Nullable * _Nullable errorOut)
 {
     struct stat rootStat;
     if (lstat(path.fileSystemRepresentation, &rootStat) != 0) {
@@ -356,7 +362,7 @@ static inline BOOL WQAppsSupportTreeDigests(NSString *path, BOOL *exists,
 // Stable identity for a small regular file (the backup manifest): size, mtime,
 // inode and the SHA-256 of its bytes. Comparing two fingerprints detects a
 // manifest that was replaced between "verified" and "trusted".
-static inline NSString *WQAppsSupportFileFingerprint(NSString *path)
+static inline NSString * _Nullable WQAppsSupportFileFingerprint(NSString *path)
 {
     struct stat st;
     if (lstat(path.fileSystemRepresentation, &st) != 0 || !S_ISREG(st.st_mode)) return nil;
@@ -379,9 +385,9 @@ static inline NSString *WQAppsSupportFileFingerprint(NSString *path)
 // fails with an error rather than producing a torn digest.
 // Content digest with an optional pacing hook: `consumeBytes` is called after
 // each chunk is read, before the next read starts.
-static inline NSString *WQAppsSupportTreeContentSignaturePaced(NSString *path, BOOL *exists,
+static inline NSString * _Nullable WQAppsSupportTreeContentSignaturePaced(NSString *path, BOOL * _Nullable exists,
                                                                void (^ _Nullable consumeBytes)(unsigned long long bytes),
-                                                               NSString **errorOut)
+                                                               NSString * _Nullable * _Nullable errorOut)
 {
     struct stat rootStat;
     if (lstat(path.fileSystemRepresentation, &rootStat) != 0) {
@@ -481,13 +487,14 @@ static inline NSString *WQAppsSupportTreeContentSignaturePaced(NSString *path, B
     return hex;
 }
 
-static inline NSString *WQAppsSupportTreeContentSignature(NSString *path, BOOL *exists, NSString **errorOut)
+static inline NSString * _Nullable WQAppsSupportTreeContentSignature(NSString *path, BOOL * _Nullable exists,
+                                                                   NSString * _Nullable * _Nullable errorOut)
 {
     return WQAppsSupportTreeContentSignaturePaced(path, exists, nil, errorOut);
 }
 
 
-static inline NSUInteger WQAppsSupportBackupSequence(NSString *name)
+static inline NSUInteger WQAppsSupportBackupSequence(NSString * _Nullable name)
 {
     if (![name isKindOfClass:NSString.class] || !name.length) return 0;
     if ([name hasSuffix:@")"]) {
@@ -521,7 +528,7 @@ typedef NS_ENUM(NSInteger, WQAppsSupportJournalState) {
     WQAppsSupportJournalUnknown,
 };
 
-static inline WQAppsSupportJournalState WQAppsSupportJournalStateForDictionary(NSDictionary *journal)
+static inline WQAppsSupportJournalState WQAppsSupportJournalStateForDictionary(NSDictionary * _Nullable journal)
 {
     if (![journal isKindOfClass:NSDictionary.class]) return WQAppsSupportJournalMissing;
     id state = journal[@"State"];
@@ -534,7 +541,8 @@ static inline WQAppsSupportJournalState WQAppsSupportJournalStateForDictionary(N
 // A new restore may start only when no recovery is pending. A committed
 // journal is safe to clean up and replace; an Active or unknown journal must
 // be recovered or explicitly discarded first.
-static inline BOOL WQAppsSupportJournalAllowsNewRestore(WQAppsSupportJournalState state, NSString **error)
+static inline BOOL WQAppsSupportJournalAllowsNewRestore(WQAppsSupportJournalState state,
+                                                       NSString * _Nullable * _Nullable error)
 {
     if (state == WQAppsSupportJournalActive) {
         if (error) *error = @"An interrupted restore is still active. Recover or discard it before starting another restore";
@@ -546,3 +554,5 @@ static inline BOOL WQAppsSupportJournalAllowsNewRestore(WQAppsSupportJournalStat
     }
     return YES;
 }
+
+NS_ASSUME_NONNULL_END

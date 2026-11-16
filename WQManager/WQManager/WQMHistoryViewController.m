@@ -237,6 +237,7 @@ typedef NS_ENUM(NSInteger, WQMHistoryFilter) {
         case WQMOperationKindExport: symbol = @"square.and.arrow.up"; break;
         case WQMOperationKindImport: symbol = @"square.and.arrow.down"; break;
         case WQMOperationKindDeleteBackup: symbol = @"trash.fill"; break;
+        case WQMOperationKindDeleteFiles: symbol = @"trash.fill"; break;
         case WQMOperationKindCleanCache: symbol = @"trash"; break;
     }
     configuration.image = [UIImage systemImageNamed:symbol];

@@ -502,7 +502,7 @@ typedef NS_ENUM(NSInteger, WQMLensSortOrder) {
 {
     NSString *path = [self currentPath];
     if (!path.length) {
-        [self showUnavailable:nil];
+        [self showUnavailable:WQMeasureResultMissing];
         return;
     }
     _backButton.hidden = NO;
@@ -1159,7 +1159,7 @@ typedef NS_ENUM(NSInteger, WQMLensSortOrder) {
                                          handler:^(__unused UIAction *action) {
         UIPasteboard.generalPasteboard.string = path;
     }]];
-    [actions addObject:[UIAction actionWithTitle:WQML(@"LENS_DELETE", @"删除")
+    UIAction *deleteAction = [UIAction actionWithTitle:WQML(@"LENS_DELETE", @"删除")
                                            image:[UIImage systemImageNamed:@"trash"]
                                       identifier:nil
                                      handler:^(__unused UIAction *action) {
@@ -1170,9 +1170,9 @@ typedef NS_ENUM(NSInteger, WQMLensSortOrder) {
             WQChildBytesKey: @(item.bytes),
             WQChildIsDirectoryKey: @(directory),
         }]];
-    }]];
-    UIAction *deleteAction = actions.lastObject;
+    }];
     deleteAction.attributes = UIMenuElementAttributesDestructive;
+    [actions addObject:deleteAction];
 
     return [UIMenu menuWithTitle:name children:actions];
 }

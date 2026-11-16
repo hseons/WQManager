@@ -182,9 +182,9 @@ int wq_process_id_for_bundle(NSString *bundleID)
         SEL sharedSelector = NSSelectorFromString(@"sharedService");
         SEL pid = NSSelectorFromString(@"pidForApplication:");
         if (serviceClass && [serviceClass respondsToSelector:sharedSelector]) {
-            id service = [serviceClass performSelector:sharedSelector];
+            sharedServiceFunction = (id (*)(id, SEL))[serviceClass methodForSelector:sharedSelector];
+            id service = sharedServiceFunction(serviceClass, sharedSelector);
             if (service && [service respondsToSelector:pid]) {
-                sharedServiceFunction = (id (*)(id, SEL))[serviceClass methodForSelector:sharedSelector];
                 pidSelector = pid;
                 pidFunction = (int (*)(id, SEL, NSString *))[service methodForSelector:pid];
             }

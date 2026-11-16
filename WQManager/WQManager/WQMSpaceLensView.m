@@ -182,6 +182,9 @@ static UIImage *WQMBubbleGrainImage(void)
         self.layer.shadowOpacity = 0.24f;
         self.layer.shadowRadius = 14.0;
         self.layer.shadowOffset = CGSizeMake(0, 8);
+        [self registerForTraitChanges:@[UITraitUserInterfaceStyle.class]
+                           withTarget:self
+                               action:@selector(updateAppearance)];
     }
     return self;
 }
@@ -377,11 +380,8 @@ static UIImage *WQMBubbleGrainImage(void)
                                                         alpha:light ? 0.06 : 0.70].CGColor;
 }
 
-- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection
+- (void)updateAppearance
 {
-    [super traitCollectionDidChange:previousTraitCollection];
-    if (!previousTraitCollection) return;
-    if (previousTraitCollection.userInterfaceStyle == self.traitCollection.userInterfaceStyle) return;
     [self applyLabelStyle];
     if (self.appliedTint) [self applyTint:self.appliedTint];
 }
@@ -483,7 +483,6 @@ static UIImage *WQMBubbleGrainImage(void)
     CGFloat canvas = size;
     UIGraphicsImageRendererFormat *format = UIGraphicsImageRendererFormat.defaultFormat;
     format.opaque = NO;
-    format.scale = UIScreen.mainScreen.scale;
     UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc]
         initWithSize:CGSizeMake(canvas, canvas) format:format];
     UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
@@ -579,6 +578,9 @@ static UIImage *WQMBubbleGrainImage(void)
         _bubbles = [NSMutableArray new];
         self.backgroundColor = UIColor.clearColor;
         self.isAccessibilityElement = NO;
+        [self registerForTraitChanges:@[UITraitUserInterfaceStyle.class]
+                           withTarget:self
+                               action:@selector(updateBubbleTints)];
     }
     return self;
 }
@@ -668,11 +670,8 @@ static UIImage *WQMBubbleGrainImage(void)
     return light ? [UIColor colorWithWhite:0.55 alpha:1.0] : [UIColor colorWithWhite:1.0 alpha:1.0];
 }
 
-- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection
+- (void)updateBubbleTints
 {
-    [super traitCollectionDidChange:previousTraitCollection];
-    if (!previousTraitCollection) return;
-    if (previousTraitCollection.userInterfaceStyle == self.traitCollection.userInterfaceStyle) return;
     UIColor *tint = [self neutralTint];
     for (WQMSpaceLensBubble *bubble in _bubbles) {
         [bubble applyTint:tint];

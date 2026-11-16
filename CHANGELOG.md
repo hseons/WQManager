@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.4.1] — 2026-11-16
+
+### Fixed
+
+- Complete nullability contracts in the shared backup helpers, including optional
+  output pointers and signatures that can fail.
+- Use a typed implementation for the process-service lookup instead of
+  `performSelector:`, and pass a measurement result for a missing Space Lens path.
+- Keep the deletion menu action typed during construction and show a trash icon
+  for file-deletion history records.
+- Observe Space Lens appearance changes with trait registrations and let the
+  image renderer choose its display scale without the deprecated main-screen API.
+
 ## [0.4.0] — 2026-11-15
 
 ### Added
