@@ -10,6 +10,13 @@
 @end
 
 @implementation WQMAppModel
+- (WQMAppModel *)snapshotCopy
+{
+    WQMAppModel *copy = [[WQMAppModel alloc] initWithBundleIdentifier:self.bundleIdentifier displayName:self.displayName containerPath:self.containerPath dataSize:self.dataSize];
+    copy.accessAvailable = self.accessAvailable; copy.identityKnown = self.identityKnown;
+    copy.sizeKnown = self.sizeKnown; copy.containerDevice = self.containerDevice; copy.containerInode = self.containerInode;
+    return copy;
+}
 
 - (instancetype)initWithBundleIdentifier:(NSString *)bundleIdentifier
                              displayName:(NSString *)displayName

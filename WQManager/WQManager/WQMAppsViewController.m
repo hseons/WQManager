@@ -5,6 +5,8 @@
 #import "WQMAppsViewController.h"
 #import "WQMAppModel.h"
 #import "WQMAppScanner.h"
+#import "WQMAccessViewController.h"
+#import "WQMFilePreviewViewController.h"
 #import "WQMAppCache.h"
 #import "WQMAppIconService.h"
 #import "WQMAppActionsViewController.h"
@@ -19,6 +21,14 @@
 #import "WQMSafetyPolicy.h"
 #import "WQMTheme.h"
 #import "WQAccess.h"
+
+static dispatch_queue_t WQMIndexSaveQueue(void)
+{
+    static dispatch_queue_t queue;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ queue = dispatch_queue_create("mumu.wqmanager.index-save", DISPATCH_QUEUE_SERIAL); });
+    return queue;
+}
 
 static NSString *WQMLoadProfileName(WQMLoadProfile profile)
 {
@@ -509,7 +519,13 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        if ([feature isEqual:@"history"]) [self showStorageChanges];
+        if ([@[@"sqlite", @"plist", @"text", @"image"] containsObject:feature]) {
+            NSDictionary *names = @{@"sqlite":@"inspection.sqlite", @"plist":@"inspection.plist", @"text":@"large.txt", @"image":@"large.png"};
+            NSString *path = [[app.containerPath stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:names[feature]];
+            [self.navigationController pushViewController:[[WQMFilePreviewViewController alloc] initWithFilePath:path name:nil] animated:NO];
+        }
+        else if ([feature isEqual:@"diagnostics"]) [self.navigationController pushViewController:[[WQMAccessViewController alloc] initWithApp:app] animated:NO];
+        else if ([feature isEqual:@"history"]) [self showStorageChanges];
         else if ([feature isEqual:@"trend"]) [self.navigationController pushViewController:[[WQMStorageChangesViewController alloc] initWithApp:app] animated:NO];
         else if ([feature isEqual:@"batch"]) [self showBackupQueue];
         else if ([feature isEqual:@"files"]) [self.navigationController pushViewController:[[WQMFilesViewController alloc] initWithApp:app] animated:NO];
@@ -650,8 +666,12 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
 
 - (void)scan
 {
+    if (_scanning) { [self.refreshControl endRefreshing]; return; }
+    WQScanCancellation *gateCancellation = [WQScanCancellation new];
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"SCANNING_APPS", @"正在查找 App…") status:nil cancelHandler:^{ [gateCancellation cancel]; }]) { [self.refreshControl endRefreshing]; return; }
     [_scanCancellation cancel];
-    WQScanCancellation *cancellation = [WQScanCancellation new];
+    WQScanCancellation *cancellation = gateCancellation;
+    NSArray *previousApps = _apps;
     _scanCancellation = cancellation;
     NSUInteger generation = ++_scanGeneration;
     _scanning = YES;
@@ -671,19 +691,26 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
         if (!self || generation != self->_scanGeneration || cancellation.isCancelled) return;
         self->_status = status;
         [self updateSummary];
+        [WQMLongOperationBanner.shared updateStatus:status];
+    } partial:^(NSArray<WQMAppModel *> *apps) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || generation != self->_scanGeneration || cancellation.cancelled) return;
+        self->_apps = apps;
+        [self rebuildVisibleApps]; [self updateSummary]; [self reloadAppListForDataChange];
     } completion:^(WQMAppScanResult *result) {
+        [WQMLongOperationBanner.shared hide];
         __strong typeof(weakSelf) self = weakSelf;
         if (!self || generation != self->_scanGeneration) return;
+        if (result.cancelled) self->_apps = previousApps;
         self->_scanning = NO;
         self->_scanCancellation = nil;
-        if (result.apps.count) {
+        if (result.apps.count && !result.cancelled) {
             self->_apps = result.apps;
             self->_status = result.status;
             self->_cacheLoadedAt = NSDate.date;
             [self->_animatedApps removeAllObjects];
-            [WQMAppCache saveResult:result];
+            dispatch_async(WQMIndexSaveQueue(), ^{ [WQMAppCache saveResult:result]; });
         } else if (self->_apps.count) {
-            self->_cacheLoadedAt = NSDate.date;
             self->_status = result.cancelled
                 ? WQML(@"APP_INDEX_UPDATE_CANCELLED", @"更新已取消，继续显示缓存索引")
                 : WQML(@"APP_INDEX_REFRESH_FAILED", @"刷新失败，继续显示上次索引");
@@ -1012,6 +1039,10 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     WQMAppActionsViewController *actions = [[WQMAppActionsViewController alloc] initWithApp:app];
     actions.actionHandler = ^(WQMAppAction action) {
         [self removeSheetBlur];
+        if (action == WQMAppActionDiagnose) {
+            [self.navigationController pushViewController:[[WQMAccessViewController alloc] initWithApp:app] animated:YES]; return;
+        }
+        if (action == WQMAppActionRefresh) { [self refreshApp:app]; return; }
         if (action == WQMAppActionCopyBundleID) {
             if (!app.bundleIdentifier.length) return;
             UIPasteboard.generalPasteboard.string = app.bundleIdentifier;
@@ -1046,6 +1077,24 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     };
     [self presentViewController:actions animated:YES completion:^{
         actions.presentationController.delegate = self;
+    }];
+}
+
+- (void)refreshApp:(WQMAppModel *)app
+{
+    WQScanCancellation *cancellation = [WQScanCancellation new];
+    if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"APP_REFRESH_ONE", @"刷新这个 App") status:app.displayName cancelHandler:^{ [cancellation cancel]; }]) return;
+    [[WQMAppScanner new] refreshApp:app cancellation:cancellation completion:^(WQMAppModel *updated) {
+        [WQMLongOperationBanner.shared hide];
+        if (!updated) return;
+        NSMutableArray *apps = [self->_apps mutableCopy];
+        NSUInteger index = [apps indexOfObjectPassingTest:^BOOL(WQMAppModel *item, NSUInteger idx, BOOL *stop) { return [item.containerPath isEqual:app.containerPath]; }];
+        if (index == NSNotFound) return;
+        apps[index] = updated; self->_apps = apps;
+        [self rebuildVisibleApps]; [self updateSummary]; [self reloadAppListForDataChange];
+        WQMAppScanResult *result = [WQMAppScanResult new]; result.apps = apps;
+        for (WQMAppModel *item in apps) if (!item.sizeKnown || !item.identityKnown || !item.accessAvailable) result.limitedCount++;
+        dispatch_async(WQMIndexSaveQueue(), ^{ [WQMAppCache saveResult:result recordHistory:NO]; });
     }];
 }
 
@@ -1283,6 +1332,9 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
                                                      handler:^(__unused UIAlertAction *a) {
                 [weakSelf scan];
             }]];
+            if (!success) [result addAction:[UIAlertAction actionWithTitle:WQML(@"ACCESS_TITLE", @"访问能力") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                [self.navigationController pushViewController:[[WQMAccessViewController alloc] initWithApp:app] animated:YES];
+            }]];
             [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
         }];
     }];
@@ -1334,6 +1386,9 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
             [result addAction:[UIAlertAction actionWithTitle:WQML(@"OK", @"确定")
                                                        style:UIAlertActionStyleDefault
                                                      handler:nil]];
+            if (error != nil) [result addAction:[UIAlertAction actionWithTitle:WQML(@"ACCESS_TITLE", @"访问能力") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                [self.navigationController pushViewController:[[WQMAccessViewController alloc] initWithApp:app] animated:YES];
+            }]];
             [WQMAlertPresenter presentViewController:result animated:YES completion:nil];
         }];
     }];

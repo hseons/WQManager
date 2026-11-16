@@ -190,7 +190,51 @@ New directory readers use the long-operation gate so they do not release a
 container token during a conflicting mutation. `WQMBackupQueue` is main-thread
 owned and invokes the existing service sequentially. Stop marks pending jobs
 cancelled and lets the current backup complete; retry selects failed jobs only.
-The queue is process-local, with no background or restart-resume guarantee.
+The queue atomically persists identifiers, names, statuses and quick/full scope,
+never container paths. On reload, running jobs become interrupted. Explicit
+resume resolves current apps, rejects ambiguous identifiers, and rechecks access
+through the existing backup service. Completed jobs are skipped; interrupted
+jobs restart as a new backup. Persistence failure prevents starting the next job.
+Backgrounding suspends subsequent jobs and requests only iOS's bounded grace for
+the active one. Returning to the foreground continues an in-process queue;
+process restart always needs explicit resume.
+
+### Progressive scans, search and previews (0.4.3)
+
+`WQMAppScanner` uses a serial queue and emits detached model snapshots every 12
+apps, at the end of its quick pass, and after each deferred measurement. UI and
+worker models do not share mutable measurement state. Cancelling restores the
+previous list and prevents index/history persistence. Single-app refresh checks
+container identity before measuring, preserves the full-index timestamp, and
+does not append a whole-scan history sample. Index writes use a serial worker.
+
+File catalogs sort once after indexing; queries stop at their result limit.
+The file screen debounces for 180 ms, searches on a serial worker, and rejects
+stale results by generation. Text/JSON reads and ImageIO thumbnail decoding run
+off the main thread. Text is capped at 64 KiB including expanded JSON; truncated
+UTF-8 keeps a complete scalar boundary. Thumbnail dimensions are capped at 4096
+pixels. Hex previews read at most 4 KiB; sharing still uses the full source file.
+
+### Structured working copies (0.4.3)
+
+`WQMStructuredFile` owns a private `WQMInspect-UUID` workspace. After the user
+closes the source app and confirms copying, no-follow descriptor reads copy the
+input (and SQLite WAL if present). Device/inode, size, mtime and ctime are checked
+before/after each copy and again across all inputs. Links, changing inputs and
+nonempty rollback journals fail. This is a best-effort stable copy, not an atomic
+snapshot of a concurrently running app. SQLite receives only workspace paths.
+
+Binary/XML plists are limited to 8 MiB; the UI paginates containers at 200 items.
+The database and WAL share a 512 MiB budget. SQLite runs with query-only,
+defensive and untrusted-schema settings; virtual tables are excluded. Queries
+have a 3-second progress deadline, 128 columns, 100 rows and 2 MiB aggregate
+display data per page. Values show at most 4 KiB; BLOBs show their byte count.
+
+Selected-table CSV uses the same value bounds, neutralizes formula prefixes,
+streams up to 10,000 rows / 16 MiB with a 10-second progress deadline, and removes
+incomplete exports. A serial worker and generation checks protect navigation.
+Sharing retains the workspace until completion; deallocation removes it and
+housekeeping removes stale tool-owned workspaces after interrupted processes.
 
 ## Restore state machine
 

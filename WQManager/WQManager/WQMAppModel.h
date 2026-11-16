@@ -25,6 +25,7 @@ typedef NS_ENUM(NSInteger, WQMAppSortOrder) {
 @property (nonatomic) BOOL sizeKnown;
 @property (nonatomic) dev_t containerDevice;
 @property (nonatomic) ino_t containerInode;
+- (WQMAppModel *)snapshotCopy;
 - (NSString *)formattedSize;
 - (NSString *)statusText;
 

@@ -21,6 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (WQMFilePreviewKind)kindForPath:(NSString *)path;
 + (BOOL)isJSONPath:(NSString *)path;
++ (NSString *)stringForData:(nullable NSData *)data;
 
 /// Reads at most maxBytes from the head of the file, so a 3 GB database stays cheap.
 + (nullable NSData *)headOfFile:(NSString *)path maxBytes:(NSUInteger)maxBytes;

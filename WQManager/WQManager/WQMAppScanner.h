@@ -17,6 +17,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface WQMAppScanner : NSObject
 
+/// Main-thread snapshots contain detached models; incomplete scans are never persisted.
+- (void)scanWithCancellation:(WQScanCancellation *)cancellation
+                    progress:(void (^_Nullable)(NSString *status))progress
+                     partial:(void (^_Nullable)(NSArray<WQMAppModel *> *apps))partial
+                  completion:(void (^)(WQMAppScanResult *result))completion;
+- (void)refreshApp:(WQMAppModel *)app cancellation:(WQScanCancellation *)cancellation
+       completion:(void (^)(WQMAppModel * _Nullable app))completion;
+
 - (void)scanWithCancellation:(WQScanCancellation *)cancellation
                     progress:(void (^_Nullable)(NSString *status))progress
                   completion:(void (^)(WQMAppScanResult *result))completion;

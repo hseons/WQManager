@@ -72,6 +72,7 @@
     UIBarButtonItem *_shareItem;
 }
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
+- (instancetype)initWithApp:(WQMAppModel *)app { if ((self = [self init])) _selectedApp = [app snapshotCopy]; return self; }
 - (void)viewDidLoad
 {
     [super viewDidLoad];

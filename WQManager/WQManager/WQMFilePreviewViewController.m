@@ -4,12 +4,14 @@
 //
 
 #import "WQMFilePreviewViewController.h"
+#import <ImageIO/ImageIO.h>
+#import "WQMStructuredViewController.h"
 #import "WQMFilePreviewModel.h"
 #import "WQMLanguageManager.h"
 #import "WQMTheme.h"
 #import <AVKit/AVKit.h>
 
-static const NSUInteger kWQMPreviewTextBytes = 2 * 1024 * 1024;
+static const NSUInteger kWQMPreviewTextBytes = 64 * 1024;
 static const NSUInteger kWQMPreviewHexBytes = 4096;
 
 @interface WQMFilePreviewViewController () <UIScrollViewDelegate>
@@ -19,7 +21,9 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
 
 @end
 
-@implementation WQMFilePreviewViewController
+@implementation WQMFilePreviewViewController {
+    NSUInteger _previewGeneration;
+}
 
 - (instancetype)initWithFilePath:(NSString *)path name:(NSString *)name
 {
@@ -49,6 +53,22 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
         return;
     }
 
+    NSString *extension = self.filePath.pathExtension.lowercaseString;
+    if ([@[@"plist", @"db", @"sqlite", @"sqlite3"] containsObject:extension]) {
+        WQMStructuredViewController *inspector = [[WQMStructuredViewController alloc] initWithPath:self.filePath];
+        [self addChildViewController:inspector];
+        inspector.view.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.view addSubview:inspector.view];
+        [NSLayoutConstraint activateConstraints:@[
+            [inspector.view.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+            [inspector.view.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor],
+            [inspector.view.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+            [inspector.view.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        ]];
+        [inspector didMoveToParentViewController:self];
+        self.navigationItem.rightBarButtonItem = nil;
+        return;
+    }
     WQMFilePreviewKind kind = [WQMFilePreviewModel kindForPath:self.filePath];
     switch (kind) {
         case WQMFilePreviewKindImage:
@@ -68,6 +88,25 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
     }
 }
 
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    if (self.isMovingFromParentViewController) _previewGeneration++;
+}
+- (void)loadHeadWithLimit:(NSUInteger)limit completion:(void (^)(NSData *))completion
+{
+    NSUInteger generation = ++_previewGeneration;
+    NSString *path = self.filePath;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *head = [WQMFilePreviewModel headOfFile:path maxBytes:limit];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (self && generation == self->_previewGeneration) completion(head);
+        });
+    });
+}
+
 #pragma mark - Sharing
 
 - (void)share:(__unused UIBarButtonItem *)sender
@@ -83,7 +122,28 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
 
 - (void)loadImage
 {
-    UIImage *image = [UIImage imageWithContentsOfFile:self.filePath];
+    NSUInteger generation = ++_previewGeneration;
+    NSString *path = self.filePath;
+    CGFloat pixels = MIN(4096, MAX(self.view.bounds.size.width, self.view.bounds.size.height) * self.traitCollection.displayScale * 2);
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path], (__bridge CFDictionaryRef)@{(__bridge NSString *)kCGImageSourceShouldCache: @NO});
+        CGImageRef thumbnail = source ? CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)@{
+            (__bridge NSString *)kCGImageSourceCreateThumbnailFromImageAlways: @YES,
+            (__bridge NSString *)kCGImageSourceCreateThumbnailWithTransform: @YES,
+            (__bridge NSString *)kCGImageSourceShouldCacheImmediately: @YES,
+            (__bridge NSString *)kCGImageSourceThumbnailMaxPixelSize: @(MAX(1, pixels))}) : NULL;
+        UIImage *image = thumbnail ? [UIImage imageWithCGImage:thumbnail] : nil;
+        if (thumbnail) CGImageRelease(thumbnail);
+        if (source) CFRelease(source);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (self && generation == self->_previewGeneration) [self displayImage:image];
+        });
+    });
+}
+- (void)displayImage:(UIImage *)image
+{
     if (!image) {
         [self showMessage:WQML(@"PREVIEW_UNREADABLE", @"无法读取这个文件") symbol:@"photo"];
         return;
@@ -98,6 +158,9 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
     scroll.showsVerticalScrollIndicator = NO;
 
     UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
+    imageView.accessibilityIdentifier = @"preview.image";
+    imageView.isAccessibilityElement = YES;
+    imageView.accessibilityLabel = self.displayName;
     imageView.translatesAutoresizingMaskIntoConstraints = NO;
     imageView.contentMode = UIViewContentModeScaleAspectFit;
     imageView.userInteractionEnabled = YES;
@@ -145,25 +208,32 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
 
 - (void)loadText
 {
-    NSData *head = [WQMFilePreviewModel headOfFile:self.filePath maxBytes:kWQMPreviewTextBytes];
+    NSUInteger generation = ++_previewGeneration;
+    NSString *path = self.filePath;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *head = [WQMFilePreviewModel headOfFile:path maxBytes:kWQMPreviewTextBytes + 1];
+        BOOL truncated = head.length > kWQMPreviewTextBytes;
+        NSData *bounded = truncated ? [head subdataWithRange:NSMakeRange(0, kWQMPreviewTextBytes)] : head;
+        NSString *pretty = !truncated && [WQMFilePreviewModel isJSONPath:path] ? [WQMFilePreviewModel prettyJSONForData:bounded maxBytes:kWQMPreviewTextBytes] : nil;
+        NSString *text = pretty ?: [WQMFilePreviewModel textForData:bounded maxBytes:kWQMPreviewTextBytes truncated:NULL];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (self && generation == self->_previewGeneration) [self displayText:head text:text truncated:truncated];
+        });
+    });
+}
+- (void)displayText:(NSData *)head text:(NSString *)text truncated:(BOOL)truncated
+{
     if (!head.length) {
         [self showMessage:WQML(@"PREVIEW_EMPTY", @"文件是空的") symbol:@"doc"];
         return;
     }
 
-    BOOL truncated = NO;
-    NSString *text = nil;
-    if ([WQMFilePreviewModel isJSONPath:self.filePath]) {
-        text = [WQMFilePreviewModel prettyJSONForData:head maxBytes:kWQMPreviewTextBytes];
-    }
-    if (!text.length) {
-        text = [WQMFilePreviewModel textForData:head maxBytes:kWQMPreviewTextBytes truncated:&truncated];
-    }
-
     UITextView *textView = [self makeTextView];
     textView.text = text ?: @"";
     [self.view addSubview:textView];
-    [self pinTextView:textView];
+    [self pinTextView:textView includeBottom:!truncated];
 
     if (truncated) {
         UILabel *footer = [self makeFooter];
@@ -183,7 +253,10 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
 
 - (void)loadHex
 {
-    NSData *head = [WQMFilePreviewModel headOfFile:self.filePath maxBytes:kWQMPreviewHexBytes];
+    [self loadHeadWithLimit:kWQMPreviewHexBytes completion:^(NSData *head) { [self displayHex:head]; }];
+}
+- (void)displayHex:(NSData *)head
+{
     if (!head.length) {
         [self showMessage:WQML(@"PREVIEW_EMPTY", @"文件是空的") symbol:@"doc"];
         return;
@@ -192,7 +265,7 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
     UITextView *textView = [self makeTextView];
     textView.text = [WQMFilePreviewModel hexDumpForData:head maxBytes:kWQMPreviewHexBytes];
     [self.view addSubview:textView];
-    [self pinTextView:textView];
+    [self pinTextView:textView includeBottom:NO];
 
     UILabel *footer = [self makeFooter];
     footer.text = WQML(@"PREVIEW_HEX_NOTE", @"二进制文件，只显示开头 4 KB");
@@ -230,25 +303,26 @@ static const NSUInteger kWQMPreviewHexBytes = 4096;
 {
     UITextView *textView = [UITextView new];
     textView.translatesAutoresizingMaskIntoConstraints = NO;
+    textView.adjustsFontForContentSizeCategory = YES;
     textView.editable = NO;
     textView.selectable = YES;
     textView.backgroundColor = WQMTheme.canvasColor;
     textView.textColor = WQMTheme.textPrimaryColor;
-    textView.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
+    textView.font = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleBody] scaledFontForFont:[UIFont monospacedSystemFontOfSize:13 weight:UIFontWeightRegular]];
     textView.textContainerInset = UIEdgeInsetsMake(16, 16, 16, 16);
     textView.alwaysBounceVertical = YES;
     textView.accessibilityIdentifier = @"preview.text";
     return textView;
 }
 
-- (void)pinTextView:(UITextView *)textView
+- (void)pinTextView:(UITextView *)textView includeBottom:(BOOL)includeBottom
 {
     [NSLayoutConstraint activateConstraints:@[
         [textView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
         [textView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [textView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [textView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor],
     ]];
+    if (includeBottom) [textView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor].active = YES;
 }
 
 - (UILabel *)makeFooter

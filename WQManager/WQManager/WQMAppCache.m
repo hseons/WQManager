@@ -65,7 +65,8 @@ static NSString *WQMAppCachePath(void)
     return snapshot;
 }
 
-+ (void)saveResult:(WQMAppScanResult *)result
++ (void)saveResult:(WQMAppScanResult *)result { [self saveResult:result recordHistory:YES]; }
++ (void)saveResult:(WQMAppScanResult *)result recordHistory:(BOOL)recordHistory
 {
     if (!result || result.cancelled || result.apps.count == 0) return;
     NSMutableArray<NSDictionary *> *entries = [NSMutableArray arrayWithCapacity:result.apps.count];
@@ -82,9 +83,10 @@ static NSString *WQMAppCachePath(void)
             @"ContainerInode": @(app.containerInode),
         }];
     }
+    NSDate *date = recordHistory ? NSDate.date : [self load].updatedAt ?: NSDate.date;
     NSDictionary *root = @{
         @"Format": @1,
-        @"UpdatedAt": NSDate.date,
+        @"UpdatedAt": date,
         @"Status": result.status ?: @"",
         @"LimitedCount": @(result.limitedCount),
         @"Apps": entries,
@@ -94,7 +96,7 @@ static NSString *WQMAppCachePath(void)
                                                               options:0
                                                                 error:nil];
     [data writeToFile:WQMAppCachePath() options:NSDataWritingAtomic error:nil];
-    [WQMScanHistory recordApps:result.apps atDate:root[@"UpdatedAt"]];
+    if (recordHistory) [WQMScanHistory recordApps:result.apps atDate:root[@"UpdatedAt"]];
 }
 
 + (void)clear

@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.4.3] — 2026-11-16
+
+The app and share extension display version **0.4**, build **15**. The internal
+release revision and Git tag are 0.4.3 / v0.4.3.
+
+### Added
+
+- Progressive app-list snapshots during scanning and a single-app refresh action
+  that rechecks container identity. Cancelled scans keep the previous index;
+  refreshing one app does not create a whole-scan history sample.
+- Persistent serial backup jobs with explicit restart/resume and quick/full scope
+  confirmation. Jobs store identifiers instead of container paths and resolve
+  current apps before execution. Backgrounding pauses subsequent jobs.
+- Direct access diagnostics from app actions and backup/restore failure dialogs.
+- Read-only binary/XML plist trees and SQLite table/schema browsing with 100-row
+  pages, plus user-selected CSV export. SQLite opens only a private working copy
+  of the database and WAL; changing files and active rollback journals are rejected.
+- GitHub Actions configuration/localization checks, 22 portable test programs,
+  simulator builds and five UI regression flows. Hosted Xcode 26 builds use an
+  isolated compatibility project generated from the main project's settings.
+
+### Changed
+
+- File catalogs sort once; searches debounce for 180 ms and filter in the
+  background with stale-result checks.
+- Text/JSON reads and image decoding move off the main thread. Text previews show
+  at most 64 KiB, images use thumbnails capped at 4096 pixels, and truncated-text
+  footers no longer conflict with the preview's bottom constraint.
+- UTF-8 truncation preserves complete characters; expanded JSON must fit the
+  display limit. Full source files remain available through sharing.
+
+### Limits
+
+- Plists: 8 MiB, 200 tree items/page. Database + WAL: 512 MiB; close the source
+  app first. Each displayed/exported value is bounded to 4 KiB; BLOBs show sizes.
+  CSV is limited to 10,000 rows / 16 MiB and incomplete exports are removed.
+- Background grace is controlled by iOS. An interrupted active job is backed up
+  again on explicit resume. Physical-device access/signing validation is pending.
+
 ## [0.4.2] — 2026-11-16
 
 The app and share extension display version **0.4**, build **14**. The release

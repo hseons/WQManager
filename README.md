@@ -111,8 +111,8 @@ Everything is local. No account, no analytics, no cloud.
   area follows its size, so the biggest folders stand out at a glance.
 - Drill into folders, jump anywhere from the breadcrumb, preview files, and
   switch to a precise list at any time.
-- Preview images, JSON, text, video and audio in place; anything else falls back
-  to a hex dump, and a multi-gigabyte file still opens instantly.
+- Preview images, JSON, text, video and audio in place; other binary formats fall
+  back to a bounded hex dump. Text shows up to 64 KiB; full files can be shared.
 - Select several items to export or delete, swipe a row to delete one, or
   long-press a bubble for preview, share, copy path or delete.
 - Deletions land in a bin (Settings → Data) that can restore items to their
@@ -153,7 +153,25 @@ Everything is local. No account, no analytics, no cloud.
 - Existing quick/full backups retain format 2. Custom backups use format 3 and
   require WQManager 0.4.0 or later to import.
 - Stopping a batch finishes its active backup first. Keep the app in the foreground;
-  interrupted batches keep completed backups, but do not resume pending jobs.
+  backgrounding pauses subsequent jobs. Saved pending/interrupted jobs can be
+  resumed explicitly after reopening, using refreshed container identities.
+
+### Performance and inspection (0.4, build 15)
+
+- App scans publish results progressively; App actions → Refresh this app updates
+  one measurement after checking identity, without adding a whole-scan history sample.
+- File search filters a sorted index on a worker queue after a 180 ms debounce.
+  Text/JSON reads and thumbnail decoding also run off the main thread; image
+  previews are capped at 4096 pixels.
+- Open `.plist`, `.db`, `.sqlite` or `.sqlite3` from file preview to make a private
+  working copy. Close the source app first. Binary/XML plist trees show 200 items
+  per page; SQLite exposes ordinary tables, schema and 100-row pages.
+- Limits: plist 8 MiB; database + WAL 512 MiB; values 4 KiB, BLOB size summaries.
+  Export one selected table as CSV, up to 10,000 rows / 16 MiB using those same
+  value bounds. Changing inputs and active rollback journals stop inspection;
+  partial CSV exports are removed. Source databases are never opened by SQLite.
+- Access diagnostics are also available from App actions and backup/restore errors.
+- GitHub Actions runs configuration checks, portable tests and simulator UI flows.
 
 See [the next WQ capability plan](docs/NEXT_STEPS_WQ.md) for future research.
 

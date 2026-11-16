@@ -224,3 +224,15 @@ clang -fobjc-arc -fblocks -I"$SOURCE_DIR" -framework Foundation -framework CoreF
   "$SOURCE_DIR/WQMOperationStore.m" "$SOURCE_DIR/WQMStorageService.m" \
   "$SOURCE_DIR/WQMSharedInbox.m" "$SOURCE_DIR/WQMBackupArchiveService.m" "$ROOT/tests/WQMBackupRestoreTests.m" -o "$OUTPUT_DIR/WQMBackupRestoreTests"
 "$OUTPUT_DIR/WQMBackupRestoreTests"
+
+clang -fobjc-arc -fblocks -I"$SOURCE_DIR" -framework Foundation -lsqlite3 \
+  "$SOURCE_DIR/WQMLanguageManager.m" "$SOURCE_DIR/WQMStructuredFile.m" \
+  "$ROOT/tests/WQMStructuredFileTests.m" -o "$OUTPUT_DIR/WQMStructuredFileTests"
+"$OUTPUT_DIR/WQMStructuredFileTests"
+
+clang -fobjc-arc -fblocks -I"$SOURCE_DIR" -framework Foundation \
+  "$SOURCE_DIR/WQMLanguageManager.m" "$SOURCE_DIR/WQMAppModel.m" \
+  "$SOURCE_DIR/WQMBackupSelection.m" "$SOURCE_DIR/WQMScanHistory.m" \
+  "$SOURCE_DIR/WQMAppScanner.m" "$ROOT/tests/WQMAppScannerTests.m" \
+  -o "$OUTPUT_DIR/WQMAppScannerTests"
+"$OUTPUT_DIR/WQMAppScannerTests"

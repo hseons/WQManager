@@ -18,6 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (nullable WQMAppCacheSnapshot *)load;
 + (void)saveResult:(WQMAppScanResult *)result;
++ (void)saveResult:(WQMAppScanResult *)result recordHistory:(BOOL)recordHistory;
 + (void)clear;
 
 @end

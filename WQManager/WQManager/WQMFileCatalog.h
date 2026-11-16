@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 @interface WQMFileCatalog : NSObject
 @property (nonatomic, copy) NSString *root;
+/// scanRoot returns size-descending order (path breaks ties); searches preserve it.
 @property (nonatomic, copy) NSArray<WQMFileEntry *> *files;
 @property (nonatomic) BOOL complete;
 @property (nonatomic) NSUInteger skippedEntries;

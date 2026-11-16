@@ -92,8 +92,10 @@
                                          primary:NO
                                           action:WQMAppActionCopyBundleID];
 
+    UIButton *refresh = [self actionButtonWithTitle:WQML(@"APP_REFRESH_ONE", @"刷新这个 App") subtitle:WQML(@"APP_REFRESH_ONE_SUB", @"重新核对身份与统计大小") symbol:@"arrow.clockwise" primary:NO action:WQMAppActionRefresh];
+    UIButton *diagnose = [self actionButtonWithTitle:WQML(@"ACCESS_TITLE", @"访问能力") subtitle:WQML(@"ACCESS_SETTINGS_SUB", @"检查受限原因与导出脱敏报告") symbol:@"stethoscope" primary:NO action:WQMAppActionDiagnose];
     UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[
-        header, quick, full, custom, restore, space, find, copy
+        header, quick, full, custom, restore, space, find, refresh, diagnose, copy
     ]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.spacing = 10;

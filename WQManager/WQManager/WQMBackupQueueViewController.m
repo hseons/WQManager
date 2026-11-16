@@ -13,35 +13,55 @@
     NSMutableSet<NSString *> *_selected;
     WQMBackupQueue *_queue;
     BOOL _previousIdleTimerDisabled;
+    UIBackgroundTaskIdentifier _backgroundTask;
+    BOOL _ownsOperation;
 }
 - (instancetype)initWithApps:(NSArray<WQMAppModel *> *)apps
 {
     if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
-        _apps = apps;
+        _apps = apps; _backgroundTask = UIBackgroundTaskInvalid;
         _selected = [NSMutableSet new];
         _queue = [[WQMBackupQueue alloc] initWithExecutor:^(WQMAppModel *app, NSInteger scope, void (^progress)(NSString *), void (^completion)(BOOL, NSString *)) {
             [[WQMBackupService new] backupApp:app scope:scope reason:@"" progress:progress completion:^(WQMBackupRecord *backup, NSError *error) { completion(backup != nil, error.localizedDescription ?: WQML(@"BACKUP_COMPLETE_TITLE", @"备份完成")); }];
-        }];
+        } storagePath:[[NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"WQManager"] stringByAppendingPathComponent:@"BackupQueue.plist"]];
+        [_queue resolveApps:apps];
+        [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(enteredBackground) name:UIApplicationDidEnterBackgroundNotification object:nil];
+        [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(enteredForeground) name:UIApplicationWillEnterForegroundNotification object:nil];
         __weak typeof(self) weakSelf = self;
         _queue.didChange = ^{ [weakSelf updateQueue]; };
         _queue.didFinish = ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
-            UIApplication.sharedApplication.idleTimerDisabled = self->_previousIdleTimerDisabled;
-            [WQMLongOperationBanner.shared hide];
+            if (self->_ownsOperation) {
+                UIApplication.sharedApplication.idleTimerDisabled = self->_previousIdleTimerDisabled;
+                self->_ownsOperation = NO; [WQMLongOperationBanner.shared hide];
+            }
+            [self endBackgroundTask];
+            if (self->_queue.persistenceError) [WQMAlertPresenter presentAlertWithTitle:WQML(@"BATCH_SAVE_FAILED", @"任务记录保存失败") message:self->_queue.persistenceError];
             [self updateQueue];
         };
     }
     return self;
 }
+- (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
+- (void)endBackgroundTask
+{
+    if (_backgroundTask != UIBackgroundTaskInvalid) { [UIApplication.sharedApplication endBackgroundTask:_backgroundTask]; _backgroundTask = UIBackgroundTaskInvalid; }
+}
+- (void)enteredBackground
+{
+    if (!_queue.running) return;
+    _queue.suspended = YES;
+    __weak typeof(self) weakSelf = self;
+    _backgroundTask = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"WQMBackupQueue" expirationHandler:^{ [weakSelf endBackgroundTask]; }];
+    [self updateQueue];
+}
+- (void)enteredForeground { [self endBackgroundTask]; _queue.suspended = NO; [self updateQueue]; }
 - (void)updateApps:(NSArray<WQMAppModel *> *)apps
 {
     if (_queue.running) return;
     _apps = apps;
-    for (WQMBackupJob *job in _queue.jobs) {
-        if (job.status != WQMBackupJobFailed) continue;
-        for (WQMAppModel *app in apps) if ([app.bundleIdentifier isEqual:job.app.bundleIdentifier]) { job.app = app; break; }
-    }
+    [_queue resolveApps:apps];
     NSMutableSet *available = [NSMutableSet new];
     for (WQMAppModel *app in apps) if (app.accessAvailable && app.identityKnown && app.bundleIdentifier.length) [available addObject:app.bundleIdentifier];
     [_selected intersectSet:available];
@@ -85,6 +105,9 @@
         start.enabled = _selected.count > 0;
         [sheet addAction:start];
     }
+    BOOL remaining = NO;
+    for (WQMBackupJob *job in _queue.jobs) if (job.status == WQMBackupJobPending || job.status == WQMBackupJobInterrupted) remaining = YES;
+    if (remaining) [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"BATCH_RESUME", @"继续未完成任务") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) { [self confirmScope:-1 retry:NO]; }]];
     BOOL failed = NO;
     for (WQMBackupJob *job in _queue.jobs) if (job.status == WQMBackupJobFailed) failed = YES;
     if (failed) [sheet addAction:[UIAlertAction actionWithTitle:WQML(@"BATCH_RETRY", @"重试失败项") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) { [self confirmScope:0 retry:YES]; }]];
@@ -97,15 +120,20 @@
     NSMutableArray *apps = [NSMutableArray new], *names = [NSMutableArray new];
     for (WQMAppModel *app in _apps) if ([_selected containsObject:app.bundleIdentifier]) { [apps addObject:app]; [names addObject:app.displayName]; }
     if (retry) { [names removeAllObjects]; for (WQMBackupJob *job in _queue.jobs) if (job.status == WQMBackupJobFailed) [names addObject:job.app.displayName]; }
-    NSString *detail = retry ? WQML(@"BATCH_RETRY", @"重试失败项") : [WQMBackupScopeDescriptor descriptorForScope:scope].detail;
-    UIAlertController *confirm = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_CONFIRM_TITLE", @"开始备份？") message:[NSString stringWithFormat:@"%@\n\n%@\n\n%@", [names componentsJoinedByString:@", "], detail, WQML(@"BATCH_CONFIRM_MESSAGE", @"请先关闭这些 App，并保持 WQManager 在前台。将逐个备份；停止剩余任务会等待当前备份完成。中断后保留已完成的备份，剩余项需重新选择。")] preferredStyle:UIAlertControllerStyleAlert];
+    BOOL resume = scope == -1;
+    if (resume) { [names removeAllObjects]; for (WQMBackupJob *job in _queue.jobs) if (job.status == WQMBackupJobPending || job.status == WQMBackupJobInterrupted) [names addObject:job.app.displayName]; }
+    NSString *detail = [WQMBackupScopeDescriptor descriptorForScope:(resume || retry) ? _queue.scope : scope].detail;
+    UIAlertController *confirm = [UIAlertController alertControllerWithTitle:WQML(@"BACKUP_CONFIRM_TITLE", @"开始备份？") message:[NSString stringWithFormat:@"%@\n\n%@\n\n%@", [names componentsJoinedByString:@", "], detail, WQML(@"BATCH_CONFIRM_MESSAGE", @"请先关闭所选 App，并保持 WQManager 在前台。将逐个备份；进入后台后暂停启动后续任务。重开后可继续未完成项，中断的 App 会重新备份。")] preferredStyle:UIAlertControllerStyleAlert];
     [confirm addAction:[UIAlertAction actionWithTitle:WQML(@"CANCEL", @"取消") style:UIAlertActionStyleCancel handler:nil]];
     [confirm addAction:[UIAlertAction actionWithTitle:WQML(@"BACKUP_START", @"开始备份") style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
         if (![WQMLongOperationBanner startOperationWithTitle:WQML(@"BATCH_BACKUP", @"批量备份") status:WQML(@"PREPARING", @"准备中…") cancelHandler:^{ [self->_queue stopRemaining]; }]) return;
         self->_previousIdleTimerDisabled = UIApplication.sharedApplication.idleTimerDisabled;
         UIApplication.sharedApplication.idleTimerDisabled = YES;
-        BOOL started = retry ? [self->_queue retryFailures] : [self->_queue startApps:apps scope:scope];
-        if (!started) { UIApplication.sharedApplication.idleTimerDisabled = self->_previousIdleTimerDisabled; [WQMLongOperationBanner.shared hide]; }
+        self->_ownsOperation = YES;
+        [self->_queue resolveApps:self->_apps];
+        BOOL started = resume ? [self->_queue resumeRemaining] : retry ? [self->_queue retryFailures] : [self->_queue startApps:apps scope:scope];
+        if (!started) { self->_ownsOperation = NO; UIApplication.sharedApplication.idleTimerDisabled = self->_previousIdleTimerDisabled; [WQMLongOperationBanner.shared hide]; }
+        if (self->_queue.persistenceError) [WQMAlertPresenter presentAlertWithTitle:WQML(@"BATCH_SAVE_FAILED", @"任务记录保存失败") message:self->_queue.persistenceError];
     }]];
     [self presentViewController:confirm animated:YES completion:nil];
 }
@@ -126,7 +154,7 @@
         cell.userInteractionEnabled = enabled && !_queue.running;
     } else {
         WQMBackupJob *job = _queue.jobs[indexPath.row]; content.text = job.app.displayName;
-        NSArray *states = @[WQML(@"BATCH_PENDING", @"等待"), WQML(@"BATCH_RUNNING", @"进行中"), WQML(@"BATCH_SUCCEEDED", @"已完成"), WQML(@"BATCH_FAILED", @"失败"), WQML(@"BATCH_CANCELLED", @"已停止")];
+        NSArray *states = @[WQML(@"BATCH_PENDING", @"等待"), WQML(@"BATCH_RUNNING", @"进行中"), WQML(@"BATCH_SUCCEEDED", @"已完成"), WQML(@"BATCH_FAILED", @"失败"), WQML(@"BATCH_CANCELLED", @"已停止"), WQML(@"STATUS_INTERRUPTED", @"已中断")];
         content.secondaryText = [NSString stringWithFormat:@"%@ · %@", states[job.status], job.message];
     }
     cell.contentConfiguration = content; return cell;

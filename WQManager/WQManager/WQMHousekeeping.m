@@ -34,6 +34,7 @@
     [self sweepDirectory:temporaryRoot prefix:@"WQMImport-" suffix:nil maxAge:maxAge];
     [self sweepDirectory:temporaryRoot prefix:@"WQMExport-" suffix:nil maxAge:maxAge];
     [self sweepDirectory:temporaryRoot prefix:@"WQMSharedImport-" suffix:nil maxAge:maxAge];
+    [self sweepDirectory:temporaryRoot prefix:@"WQMInspect-" suffix:nil maxAge:maxAge];
     [WQMSharedInbox purgeStaleItemsOlderThan:maxAge freedBytes:NULL];
 }
 

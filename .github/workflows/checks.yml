@@ -1,0 +1,78 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  portable:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configuration and localization
+        run: python3 tests/check_project.py
+      - name: Portable and integration tests
+        run: bash tests/run_tests.sh
+  simulator:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest installed Xcode
+        run: |
+          python3 - <<'PY'
+          import glob, plistlib, subprocess
+          apps = []
+          for path in glob.glob('/Applications/Xcode*.app'):
+              with open(path + '/Contents/Info.plist', 'rb') as file:
+                  version = plistlib.load(file)['CFBundleShortVersionString']
+              try:
+                  parts = tuple(int(value) for value in version.split('.'))
+              except ValueError:
+                  continue
+              apps.append((parts, path))
+          assert apps, 'No Xcode installed'
+          version, path = max(apps)
+          assert version >= (26, 0), 'Install Xcode 26 or later on the runner.'
+          subprocess.run(['sudo', 'xcode-select', '-s', path + '/Contents/Developer'], check=True)
+          PY
+      - name: Prepare compatible CI project
+        run: |
+          gem install xcodeproj --version 1.27.0 --no-document --user-install
+          ruby tests/prepare_ci_project.rb "$RUNNER_TEMP/WQManager-CI"
+      - name: Build simulator and share extension
+        run: >-
+          xcodebuild -project "$RUNNER_TEMP/WQManager-CI/WQManager.xcodeproj"
+          -scheme WQManager -configuration Debug -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/WQManager"
+          CODE_SIGNING_ALLOWED=NO build
+      - name: Boot an isolated UI test simulator
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          state = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', '-j']))
+          runtimes = [r for r in state['runtimes'] if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-') and int(r['version'].split('.')[0]) >= 26]
+          assert runtimes, 'Install an iOS 26+ simulator runtime on the runner.'
+          runtime = max(runtimes, key=lambda r: tuple(map(int, r['version'].split('.'))))
+          udid = subprocess.check_output(['xcrun', 'simctl', 'create', 'WQManager UI checks', 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro', runtime['identifier']], text=True).strip()
+          with open(os.environ['GITHUB_ENV'], 'a') as file:
+              file.write('WQM_UI_DEVICE=' + udid + '\n')
+          subprocess.run(['xcrun', 'simctl', 'boot', udid], check=True)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True)
+          PY
+      - name: UI regression flows
+        run: bash tests/UI/run_ui_tests.sh "$WQM_UI_DEVICE" "$RUNNER_TEMP/WQManager/Build/Products/Debug-iphonesimulator/WQManager.app"
+        env:
+          WQM_UI_DERIVED_DATA: ${{ runner.temp }}/WQManager-UITests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-test-results
+          path: ${{ runner.temp }}/WQManager-UITests/Logs/Test/*.xcresult
+          if-no-files-found: ignore
+      - name: Remove CI simulator
+        if: always() && env.WQM_UI_DEVICE != ''
+        run: xcrun simctl delete "$WQM_UI_DEVICE"

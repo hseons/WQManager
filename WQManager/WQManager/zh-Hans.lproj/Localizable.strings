@@ -583,7 +583,7 @@
 "BATCH_ACTIONS" = "操作";
 "BATCH_BACKUP" = "批量备份";
 "BATCH_CANCELLED" = "已停止";
-"BATCH_CONFIRM_MESSAGE" = "请先关闭这些 App，并保持 WQManager 在前台。将逐个备份；停止剩余任务会等待当前备份完成。中断后保留已完成的备份，剩余项需重新选择。";
+"BATCH_CONFIRM_MESSAGE" = "请先关闭所选 App，并保持 WQManager 在前台。将逐个备份；进入后台后暂停启动后续任务。重开后可继续未完成项，中断的 App 会重新备份。";
 "BATCH_DESELECT" = "取消全选";
 "BATCH_FAILED" = "失败";
 "BATCH_PENDING" = "等待";
@@ -704,3 +704,25 @@
 "ACCESS_EXPORT_FAILED" = "报告生成失败，请稍后重试。";
 "ACCESS_SETTINGS_SUB" = "检查受限原因与导出脱敏报告";
 "ACCESS_SIGNING_UNKNOWN" = "本次未取得完整签名权限信息；请以真机检查和实际目录访问结果为准。";
+
+/* Storage workflow improvements */
+"APP_REFRESH_ONE" = "刷新这个 App";
+"APP_REFRESH_ONE_SUB" = "重新核对身份与统计大小";
+"BATCH_REFRESH_REQUIRED" = "请先刷新应用索引，再重试此项。";
+"BATCH_RESUME" = "继续未完成任务";
+"BATCH_SAVE_FAILED" = "任务记录保存失败";
+"INSPECT_DB_NOTE" = "工作副本 · 点击表查看结构和数据。每页 100 行；每个值最多显示 4 KB，BLOB 显示大小。";
+"INSPECT_EXPORT" = "导出此表 CSV";
+"INSPECT_EXPORT_NOTE" = "CSV 导出上限 10000 行／16 MB；每个值最多 4 KB，BLOB 仅导出大小。达到上限会停止并移除未完成文件。";
+"INSPECT_INTRO" = "只读查看。请先关闭来源 App，再制作工作副本。plist 上限 8 MB；数据库与 WAL 合计上限 512 MB。正在变化或带恢复日志的数据库会停止读取。";
+"INSPECT_LOADING" = "正在读取…";
+"INSPECT_NEXT" = "下一页";
+"INSPECT_OPEN" = "制作只读工作副本";
+"INSPECT_PAGE" = "第 %lu–%lu 行 · 每个值最多 4 KB，BLOB 显示大小。";
+"INSPECT_PLIST" = "属性列表";
+"INSPECT_PLIST_NOTE" = "plist 树 · 每页最多 200 项。点击容器展开，点击值查看详情。";
+"INSPECT_PREVIOUS" = "上一页";
+"INSPECT_READ_ERROR" = "读取失败：文件可能损坏、正在变化或超过查看上限。请关闭来源 App 后重试。查看仅使用工作副本。";
+"INSPECT_ROW" = "第 %lu 行";
+"INSPECT_TABLES" = "数据库表";
+"INSPECT_TITLE" = "结构化文件";

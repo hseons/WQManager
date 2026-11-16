@@ -18,7 +18,7 @@
 | App Group | `group.mumu.wqmanager` |
 | Scheme | `WQManager` |
 | Deployment target | `26.0` |
-| Marketing version | `0.4.1` |
+| Marketing version | `0.4` (build `15`, release revision `0.4.3`) |
 
 If you fork the project, change the bundle identifiers, the App Group, and the
 entitlements of **both** targets to your own values. The app and the share
@@ -78,6 +78,7 @@ entitlements) is ignored by Git.
 ## Tests
 
 ```sh
+python3 tests/check_project.py
 bash tests/run_tests.sh
 ```
 
@@ -104,7 +105,7 @@ only in `DEBUG` builds.
 | `WQM_UI_SETTINGS_SCROLL=1` | scroll Settings to the bottom |
 | `WQM_UI_BACKUP_QUERY=wx` | prefill the backup search field |
 | `WQM_UI_ACTION_PANEL=1` | open the action sheet for the first app |
-| `WQM_UI_FEATURE=files` | open a new feature with fixture data: `files`, `history`, `trend`, `batch`, `selection`, `backup`, or `compare` |
+| `WQM_UI_FEATURE=files` | open a new feature with fixture data: `files`, `history`, `trend`, `batch`, `selection`, `backup`, `compare`, `sqlite`, `plist`, `text`, `image`, or `diagnostics` |
 | `WQM_UI_RESEED_BACKUPS=1` | add backup fixtures for comparison screenshots (Debug only) |
 | `WQM_UI_LENS=1` | push the Space Lens for the first app (fixture app 微信 gets a synthetic 13.71 GB container) |
 | `WQM_UI_LENS_APP=com.tencent.xin` | pick which app the Space Lens opens |
@@ -167,3 +168,36 @@ the extension. Re-scan from Settings → "Clear App Index Cache".
 
 Restore requires the same bundle ID to be installed, closed and identity-verified.
 Stale identity data after an app update is handled by re-scanning.
+
+## UI regression tests
+
+Install a Debug simulator build first. The UI suite uses an already installed
+`mumu.pduola.WQManager` app and synthetic files under its `tmp/WQMContainerFixture`.
+It never scans real app data. Supply a booted simulator UDID:
+
+```sh
+python3 tests/UI/prepare_fixtures.py SIMULATOR_UDID
+xcodebuild -project tests/UI/WQMUITests.xcodeproj -scheme WQMUITests \
+  -destination 'platform=iOS Simulator,id=SIMULATOR_UDID' \
+  -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
+```
+
+The suite covers plist navigation, SQLite paging/export, file search, direct
+access diagnostics, large-image preview and truncated-text layout. Screenshots
+are attached to the `.xcresult` bundle. Use `DEVELOPER_DIR` if Command Line Tools
+are selected globally.
+
+Hosted macOS runners use Xcode 26+ and an isolated conventional project generated
+from `project.xcproj` settings. `tests/prepare_ci_project.rb` needs the pinned
+`xcodeproj` gem (1.27.0), copies only the two source folders into a new destination,
+and includes the share extension, shared inbox source, localized resources and
+SQLite linkage. It never edits the main Xcode 27.2 project. CI builds this copy,
+creates its own iOS 26+ simulator, and runs the same UI suite. For a local check:
+
+```sh
+gem install xcodeproj --version 1.27.0 --no-document --user-install
+ruby tests/prepare_ci_project.rb /tmp/WQManager-CI
+xcodebuild -project /tmp/WQManager-CI/WQManager.xcodeproj -scheme WQManager \
+  -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO build
+```

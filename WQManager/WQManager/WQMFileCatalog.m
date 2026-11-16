@@ -107,7 +107,9 @@ static NSData *WQMCatalogDigest(NSString *root, WQMFileEntry *entry, WQMFileCata
     int fd = WQOpenDirectoryNoLinks(root);
     if (fd < 0) complete = NO;
     else { WQMCatalogWalk(fd, @"", files, &visited, &skipped, &complete, cancellation, 0); close(fd); }
-    catalog.files = files;
+    catalog.files = [files sortedArrayUsingComparator:^NSComparisonResult(WQMFileEntry *a, WQMFileEntry *b) {
+        return a.bytes == b.bytes ? [a.relativePath compare:b.relativePath] : a.bytes > b.bytes ? NSOrderedAscending : NSOrderedDescending;
+    }];
     catalog.complete = complete && !cancellation.cancelled;
     catalog.skippedEntries = skipped;
     return catalog;
@@ -120,12 +122,10 @@ static NSData *WQMCatalogDigest(NSString *root, WQMFileEntry *entry, WQMFileCata
     for (WQMFileEntry *file in self.files) {
         if (file.bytes < minimumBytes || (query.length && [file.relativePath rangeOfString:query options:NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch].location == NSNotFound) ||
             (suffix.length && ![file.relativePath.pathExtension.lowercaseString isEqualToString:suffix])) continue;
+        if (matched.count >= limit) break;
         [matched addObject:file];
     }
-    [matched sortUsingComparator:^NSComparisonResult(WQMFileEntry *a, WQMFileEntry *b) {
-        return a.bytes == b.bytes ? [a.relativePath compare:b.relativePath] : a.bytes > b.bytes ? NSOrderedAscending : NSOrderedDescending;
-    }];
-    return matched.count > limit ? [matched subarrayWithRange:NSMakeRange(0, limit)] : matched;
+    return matched;
 }
 + (NSArray<NSDictionary *> *)compareOlder:(WQMFileCatalog *)older newer:(WQMFileCatalog *)newer
                                     exact:(BOOL)exact cancellation:(WQMFileCatalogCancellation *)cancellation

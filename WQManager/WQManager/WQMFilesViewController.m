@@ -25,7 +25,8 @@
     unsigned long long _minimum;
     BOOL _exact, _loading;
     UISearchController *_search;
-    NSUInteger _generation;
+    NSUInteger _generation, _queryGeneration;
+    dispatch_queue_t _searchQueue;
 }
 - (instancetype)initWithApp:(WQMAppModel *)app { if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) _app = app; return self; }
 - (instancetype)initWithBackup:(WQMBackupRecord *)backup { if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) _backup = backup; return self; }
@@ -41,6 +42,7 @@
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
     self.tableView.accessibilityIdentifier = @"files.table";
     _extension = @"";
+    _searchQueue = dispatch_queue_create("mumu.wqmanager.search", DISPATCH_QUEUE_SERIAL);
     _search = [[UISearchController alloc] initWithSearchResultsController:nil];
     _search.searchResultsUpdater = self;
     _search.obscuresBackgroundDuringPresentation = NO;
@@ -54,7 +56,7 @@
     [self reloadFiles];
 }
 - (void)dealloc { [_cancellation cancel]; }
-- (void)viewWillDisappear:(BOOL)animated { [super viewWillDisappear:animated]; if (self.isMovingFromParentViewController) [_cancellation cancel]; }
+- (void)viewWillDisappear:(BOOL)animated { [super viewWillDisappear:animated]; if (self.isMovingFromParentViewController) { [_cancellation cancel]; _queryGeneration++; } }
 - (void)reloadFiles
 {
     if (_loading) { [self.refreshControl endRefreshing]; return; }
@@ -118,19 +120,38 @@
 - (void)updateSearchResultsForSearchController:(UISearchController *)searchController { [self applyQuery]; }
 - (void)applyQuery
 {
-    NSString *query = _search.searchBar.text ?: @"";
-    if (_older) {
-        NSPredicate *predicate = [NSPredicate predicateWithBlock:^BOOL(NSDictionary *row, NSDictionary *bindings) {
-            return !query.length || [row[@"Path"] rangeOfString:query options:NSCaseInsensitiveSearch].location != NSNotFound;
-        }];
-        _visibleChanges = [_changes filteredArrayUsingPredicate:predicate];
-    } else {
-        _rows = [_catalog filesMatching:query extension:_extension minimumBytes:_minimum limit:1000];
-        if (_backup) {
-            _rows = [_rows filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(WQMFileEntry *file, NSDictionary *bindings) { return ![file.relativePath isEqual:@"manifest.plist"]; }]];
-        }
-    }
-    [self.tableView reloadData];
+    NSUInteger generation = ++_queryGeneration;
+    NSString *query = [_search.searchBar.text copy] ?: @"";
+    NSString *extension = [_extension copy];
+    unsigned long long minimum = _minimum;
+    WQMFileCatalog *catalog = _catalog;
+    NSArray *changes = _changes;
+    BOOL comparing = _older != nil, backup = _backup != nil;
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.18 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || generation != self->_queryGeneration) return;
+        dispatch_async(self->_searchQueue, ^{
+            NSArray *rows;
+            if (comparing) {
+                NSPredicate *predicate = [NSPredicate predicateWithBlock:^BOOL(NSDictionary *row, NSDictionary *bindings) {
+                    return !query.length || [row[@"Path"] rangeOfString:query options:NSCaseInsensitiveSearch].location != NSNotFound;
+                }];
+                rows = [changes filteredArrayUsingPredicate:predicate];
+            } else {
+                rows = [catalog filesMatching:query extension:extension minimumBytes:minimum limit:1000];
+                if (backup) {
+                    rows = [rows filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(WQMFileEntry *file, NSDictionary *bindings) { return ![file.relativePath isEqual:@"manifest.plist"]; }]];
+                }
+            }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self || generation != self->_queryGeneration) return;
+            if (comparing) self->_visibleChanges = rows; else self->_rows = rows;
+            [self.tableView reloadData];
+        });
+        });
+    });
 }
 - (void)options
 {

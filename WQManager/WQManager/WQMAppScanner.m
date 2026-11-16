@@ -4,6 +4,7 @@
 #import "WQMLanguageManager.h"
 #import "WQAccess.h"
 #import "WQLaunchServices.h"
+#import "WQMContainerAccess.h"
 
 #import <sys/stat.h>
 #include <fcntl.h>
@@ -189,17 +190,53 @@ static NSString *WQMSeedContainerFixture(void)
 }
 #endif
 
+static dispatch_queue_t WQMScanQueue(void)
+{
+    static dispatch_queue_t queue;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ queue = dispatch_queue_create("mumu.wqmanager.scan", DISPATCH_QUEUE_SERIAL); });
+    return queue;
+}
+
 @implementation WQMAppScanner
+- (void)refreshApp:(WQMAppModel *)app cancellation:(WQScanCancellation *)cancellation completion:(void (^)(WQMAppModel *))completion
+{
+    WQMAppModel *snapshot = [app snapshotCopy];
+    dispatch_async(WQMScanQueue(), ^{
+        int fd = WQMOpenAppContainer(snapshot);
+        BOOL valid = fd >= 0;
+        if (valid) close(fd);
+        unsigned long long bytes = 0;
+        WQMeasureResult measured = valid ? wq_measure_tree(snapshot.containerPath, cancellation, &bytes) : WQMeasureResultLimited;
+        wq_drop_grant(snapshot.containerPath);
+        snapshot.dataSize = bytes;
+        snapshot.sizeKnown = valid && measured == WQMeasureResultKnown;
+        snapshot.accessAvailable = valid;
+        if (!valid) snapshot.identityKnown = NO;
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(cancellation.cancelled ? nil : snapshot); });
+    });
+}
+- (void)scanWithCancellation:(WQScanCancellation *)cancellation progress:(void (^)(NSString *))progress completion:(void (^)(WQMAppScanResult *))completion
+{
+    [self scanWithCancellation:cancellation progress:progress partial:nil completion:completion];
+}
 
 - (void)scanWithCancellation:(WQScanCancellation *)cancellation
                     progress:(void (^_Nullable)(NSString *status))progress
+                     partial:(void (^_Nullable)(NSArray<WQMAppModel *> *apps))partial
                   completion:(void (^)(WQMAppScanResult *result))completion
 {
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    dispatch_async(WQMScanQueue(), ^{
         void (^report)(NSString *) = ^(NSString *status) {
             if (progress) dispatch_async(dispatch_get_main_queue(), ^{ progress(status); });
         };
 
+        void (^publish)(NSArray *) = ^(NSArray *apps) {
+            if (!partial || cancellation.cancelled) return;
+            NSMutableArray *copies = [NSMutableArray new];
+            for (WQMAppModel *app in apps) [copies addObject:[app snapshotCopy]];
+            dispatch_async(dispatch_get_main_queue(), ^{ if (!cancellation.cancelled) partial(copies); });
+        };
         WQMAppScanResult *result = [WQMAppScanResult new];
         report(WQML(@"SCAN_FINDING_CONTAINERS", @"正在查找 App 容器…"));
         WQMScanDiagStart(0);
@@ -354,6 +391,7 @@ static NSString *WQMSeedContainerFixture(void)
                 WQMeasureBudget budget = { .maxEntries = 12000, .maxSeconds = 0.25 };
                 WQMeasureResult measured = wq_measure_tree_budgeted(container, cancellation, &bytes, budget);
                 if (measured == WQMeasureResultCancelled) {
+                    wq_drop_grant(container);
                     result.cancelled = YES;
                     break;
                 }
@@ -379,7 +417,9 @@ static NSString *WQMSeedContainerFixture(void)
                 (t1 - t0) * 1000.0, (t2 - t1) * 1000.0, (t3 - t2) * 1000.0,
                 granted, container.lastPathComponent]);
             [apps addObject:app];
+            if (apps.count % 12 == 0) publish(apps);
         }
+        publish(apps);
 
         if (!result.cancelled && deferred.count > 0) {
             NSUInteger done = 0;
@@ -407,6 +447,7 @@ static NSString *WQMSeedContainerFixture(void)
                     }
                     if (path.length) wq_drop_grant(path);
                 }
+                publish(apps);
             }
         }
 
@@ -440,7 +481,11 @@ static NSString *WQMSeedContainerFixture(void)
         }
 
         WQMScanDiagStop(result.cancelled ? @"cancelled" : @"done");
-        dispatch_async(dispatch_get_main_queue(), ^{ completion(result); });
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // Cancellation may arrive after the worker finishes but before delivery.
+            if (cancellation.cancelled) { result.cancelled = YES; result.apps = @[]; }
+            completion(result);
+        });
     });
 }
 

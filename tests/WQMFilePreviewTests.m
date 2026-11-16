@@ -42,6 +42,10 @@ int main(void)
         NSString *cut = [WQMFilePreviewModel textForData:[@"abcdefghij" dataUsingEncoding:NSUTF8StringEncoding]
                                                 maxBytes:4 truncated:&truncated];
         WQMAssert(truncated && [cut isEqualToString:@"abcd"], @"text truncation is reported");
+        NSData *unicode = [@"中文😀后续" dataUsingEncoding:NSUTF8StringEncoding];
+        for (NSUInteger limit = 7; limit < 10; limit++) {
+            WQMAssert([[WQMFilePreviewModel textForData:unicode maxBytes:limit truncated:NULL] isEqual:@"中文"], @"split UTF-8 scalar does not change preview encoding");
+        }
 
         NSData *json = [@"{\"b\":2,\"a\":[1,true]}" dataUsingEncoding:NSUTF8StringEncoding];
         NSString *pretty = [WQMFilePreviewModel prettyJSONForData:json maxBytes:1024];
@@ -49,6 +53,7 @@ int main(void)
         WQMAssert([WQMFilePreviewModel prettyJSONForData:[@"not json" dataUsingEncoding:NSUTF8StringEncoding]
                                                 maxBytes:1024] == nil, @"invalid json returns nil");
         WQMAssert([WQMFilePreviewModel prettyJSONForData:json maxBytes:4] == nil, @"oversized json is skipped");
+        WQMAssert([WQMFilePreviewModel prettyJSONForData:json maxBytes:json.length] == nil, @"expanded JSON also respects the display byte limit");
 
         WQMAssert([WQMFilePreviewModel hexDumpForData:[NSData data] maxBytes:16].length == 0, @"empty data yields empty dump");
         printf("WQM file preview tests passed\n");

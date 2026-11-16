@@ -97,6 +97,14 @@
     BOOL cut = data.length >= maxBytes;
     NSData *head = cut ? [data subdataWithRange:NSMakeRange(0, maxBytes)] : data;
     if (truncated) *truncated = cut;
+    if (cut) {
+        // A byte limit may split the final UTF-8 scalar. Keep the valid prefix
+        // rather than interpreting the whole preview as a different encoding.
+        for (NSUInteger tail = 0; tail <= 3 && tail < head.length; tail++) {
+            NSString *text = [[NSString alloc] initWithBytes:head.bytes length:head.length - tail encoding:NSUTF8StringEncoding];
+            if (text) return text;
+        }
+    }
     return [self stringForData:head];
 }
 
@@ -108,7 +116,7 @@
     NSData *pretty = [NSJSONSerialization dataWithJSONObject:object
                                                      options:NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys
                                                        error:NULL];
-    if (!pretty) return nil;
+    if (!pretty || pretty.length > maxBytes) return nil;
     return [[NSString alloc] initWithData:pretty encoding:NSUTF8StringEncoding];
 }
 

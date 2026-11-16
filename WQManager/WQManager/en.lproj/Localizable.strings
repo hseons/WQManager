@@ -583,7 +583,7 @@
 "BATCH_ACTIONS" = "Actions";
 "BATCH_BACKUP" = "Batch backup";
 "BATCH_CANCELLED" = "Stopped";
-"BATCH_CONFIRM_MESSAGE" = "Close these apps first and keep WQManager in the foreground. Backups run one at a time. Stopping finishes the current backup first. Completed backups survive interruption; select the remaining apps again.";
+"BATCH_CONFIRM_MESSAGE" = "Close the selected apps and keep WQManager in the foreground. Jobs run one at a time. In the background, no new job starts. Unfinished jobs can be resumed after reopening; an interrupted app is backed up again.";
 "BATCH_DESELECT" = "Deselect all";
 "BATCH_FAILED" = "Failed";
 "BATCH_PENDING" = "Pending";
@@ -704,3 +704,25 @@
 "ACCESS_EXPORT_FAILED" = "The report could not be created. Please retry later.";
 "ACCESS_SETTINGS_SUB" = "Check restricted access and export a redacted report";
 "ACCESS_SIGNING_UNKNOWN" = "Complete signing entitlement evidence was not available. Use a physical device check and actual directory access results.";
+
+/* Storage workflow improvements */
+"APP_REFRESH_ONE" = "Refresh this app";
+"APP_REFRESH_ONE_SUB" = "Recheck identity and measure storage";
+"BATCH_REFRESH_REQUIRED" = "Refresh the app index before retrying this job.";
+"BATCH_RESUME" = "Resume unfinished jobs";
+"BATCH_SAVE_FAILED" = "Could not save job state";
+"INSPECT_DB_NOTE" = "Working copy · Select a table for its structure and data. 100 rows per page; text up to 4 KB per value; BLOBs show their size.";
+"INSPECT_EXPORT" = "Export this table as CSV";
+"INSPECT_EXPORT_NOTE" = "CSV export limit: 10000 rows / 16 MB; text up to 4 KB per value; BLOBs export their size. Exceeding a limit removes the unfinished export.";
+"INSPECT_INTRO" = "Read-only inspection. Close the source app before making a working copy. Plist limit: 8 MB. Database plus WAL limit: 512 MB. Changing files and databases with a recovery journal stop the read.";
+"INSPECT_LOADING" = "Reading…";
+"INSPECT_NEXT" = "Next page";
+"INSPECT_OPEN" = "Make read-only working copy";
+"INSPECT_PAGE" = "Rows %lu–%lu · Text up to 4 KB per value; BLOBs show their size.";
+"INSPECT_PLIST" = "Property list";
+"INSPECT_PLIST_NOTE" = "Plist tree · Up to 200 items per page. Tap a container to expand or a value for details.";
+"INSPECT_PREVIOUS" = "Previous page";
+"INSPECT_READ_ERROR" = "Read failed: the file may be damaged, changing, or above the inspection limit. Close the source app and try again. Inspection uses a working copy.";
+"INSPECT_ROW" = "Row %lu";
+"INSPECT_TABLES" = "Database tables";
+"INSPECT_TITLE" = "Structured file";
