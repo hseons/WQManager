@@ -36,6 +36,19 @@ int main(void)
         WQMAssert([loaded.firstObject.bundleIdentifier isEqualToString:@"com.tencent.xin"],
                   @"bundle id should round-trip");
 
+        // A record left Running by a crashed previous process must not stay
+        // "Running" forever after the next launch.
+        WQMOperationRecord *stale = [WQMOperationStore beginOperation:WQMOperationKindExport
+                                                              appName:@"微信"
+                                                     bundleIdentifier:@"com.tencent.xin"];
+        WQMAssert(stale.status == WQMOperationStatusRunning, @"new record starts as running");
+        [WQMOperationStore setStorageRootForTesting:root];
+        WQMOperationRecord *recovered = [WQMOperationStore allOperations].firstObject;
+        WQMAssert(recovered.status == WQMOperationStatusInterrupted,
+                  @"running record should become interrupted after relaunch");
+        WQMAssert(recovered.finishedAt != nil, @"interrupted record should get a finish time");
+        WQMAssert(recovered.message.length > 0, @"interrupted record should explain itself");
+
         [WQMOperationStore clear];
         WQMAssert([WQMOperationStore allOperations].count == 0, @"clear should remove records");
         [NSFileManager.defaultManager removeItemAtPath:root error:nil];

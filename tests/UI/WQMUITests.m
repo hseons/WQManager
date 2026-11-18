@@ -75,4 +75,100 @@
     [self attachScreenshot:app name:@"direct-app-diagnostics"];
     [app terminate];
 }
+- (void)testAppActionPanelExpandsMoreTools
+{
+    XCUIApplication *app = [[XCUIApplication alloc] initWithBundleIdentifier:@"mumu.pduola.WQManager"];
+    app.launchEnvironment = @{@"WQM_UI_FIXTURES":@"1", @"WQM_UI_ACTION_PANEL":@"1",
+        @"WQM_UI_APPEARANCE":@"light", @"WQM_ICON_REMOTE":@"0"};
+    app.launchArguments = @[@"-WQMAcceptedDisclaimerVersion", @"2026-11-10-v1", @"-WQManagerLanguage", @"zh-Hans"];
+    [app launch];
+
+    XCUIElement *more = app.buttons[@"app.action.more"];
+    XCTAssertTrue([more waitForExistenceWithTimeout:15]);
+    XCTNSPredicateExpectation *hittable = [[XCTNSPredicateExpectation alloc] initWithPredicate:
+        [NSPredicate predicateWithFormat:@"hittable == YES"] object:more];
+    XCTAssertEqual([XCTWaiter waitForExpectations:@[hittable] timeout:15], XCTWaiterResultCompleted);
+    [self attachScreenshot:app name:@"app-actions-more-button-zh"];
+
+    XCUIElement *custom = app.buttons[@"app.action.customBackup"];
+    XCTAssertFalse(custom.hittable);
+    [more tap];
+
+    XCTNSPredicateExpectation *expanded = [[XCTNSPredicateExpectation alloc] initWithPredicate:
+        [NSPredicate predicateWithFormat:@"hittable == YES"] object:custom];
+    XCTAssertEqual([XCTWaiter waitForExpectations:@[expanded] timeout:10], XCTWaiterResultCompleted);
+    [self attachScreenshot:app name:@"app-actions-more-tools-zh"];
+    [app terminate];
+}
+- (void)testExportCenterFiltersAndSelection
+{
+    XCUIApplication *app = [self launchFeature:@"export" language:@"zh-Hans"];
+    XCTAssertTrue([app.tables[@"export.table"] waitForExistenceWithTimeout:15]);
+    XCUIElement *categories = app.segmentedControls[@"export.categories"];
+    XCTAssertTrue([categories waitForExistenceWithTimeout:10]);
+    [categories.buttons[@"图片"] tap];
+    XCUIElement *file = app.cells[@"export.file.0"];
+    XCTAssertTrue([file waitForExistenceWithTimeout:10]);
+    [file tap];
+    XCTAssertTrue(app.buttons[@"export.action"].enabled);
+    XCUIElement *selection = [[app.staticTexts matchingPredicate:
+        [NSPredicate predicateWithFormat:@"label CONTAINS %@", @"已选 1 项"]] firstMatch];
+    XCTAssertTrue(selection.exists);
+    [self attachScreenshot:app name:@"export-center-images-zh"];
+    [app.buttons[@"export.action"] tap];
+    XCUIElement *share = app.buttons[@"分享…"];
+    if (!share.exists) {
+        share = [[app.buttons matchingPredicate:[NSPredicate predicateWithFormat:@"label BEGINSWITH %@", @"分享"]] firstMatch];
+    }
+    XCTAssertTrue([share waitForExistenceWithTimeout:15]);
+    [self attachScreenshot:app name:@"export-center-choice-zh"];
+    [share tap];
+    XCTAssertTrue([app.otherElements[@"ActivityListView"] waitForExistenceWithTimeout:15]);
+    [app terminate];
+}
+- (void)testGlobalFileSearch
+{
+    XCUIApplication *app = [self launchFeature:@"search" language:@"zh-Hans"];
+    XCTAssertTrue([app.tables[@"global-search.table"] waitForExistenceWithTimeout:15]);
+    XCUIElement *search = app.searchFields[@"global-search.field"];
+    if (!search.exists) search = app.textFields[@"global-search.field"];
+    XCTAssertTrue([search waitForExistenceWithTimeout:10]);
+    [search tap];
+    [search typeText:@"duplicate\n"];
+    XCUIElement *file = app.cells[@"global-search.file.0"];
+    XCTAssertTrue([file waitForExistenceWithTimeout:15]);
+    [self attachScreenshot:app name:@"global-file-search-zh"];
+    [file tap];
+    XCTAssertTrue([app.buttons[@"预览"] waitForExistenceWithTimeout:5]);
+    XCUIElement *close = app.buttons[@"关闭"];
+    if (!close.exists) close = app.buttons[@"取消"];
+    XCTAssertTrue([close waitForExistenceWithTimeout:5]);
+    [close tap];
+    [app terminate];
+}
+
+- (void)testLargeDuplicateAuditVerification
+{
+    XCUIApplication *app = [self launchFeature:@"audit" language:@"zh-Hans"];
+    XCTAssertTrue([app.tables[@"file-audit.table"] waitForExistenceWithTimeout:15]);
+    [self attachScreenshot:app name:@"file-audit-large-zh"];
+    XCUIElement *modes = app.segmentedControls[@"file-audit.modes"];
+    XCTAssertTrue([modes waitForExistenceWithTimeout:10]);
+    [modes.buttons[@"重复文件"] tap];
+    [self attachScreenshot:app name:@"file-audit-duplicates-zh"];
+    XCUIElement *group = app.cells[@"audit.duplicate.0"];
+    XCTAssertTrue([group waitForExistenceWithTimeout:10]);
+    [group tap];
+    XCTAssertTrue([app.tables[@"duplicate.table"] waitForExistenceWithTimeout:15]);
+    XCUIElement *duplicate = app.cells[@"duplicate.file.0.0"];
+    XCTAssertTrue([duplicate waitForExistenceWithTimeout:15]);
+    [duplicate tap];
+    XCTAssertTrue(app.buttons[@"duplicate.trash"].enabled);
+    [self attachScreenshot:app name:@"duplicate-verification-zh"];
+    [app.buttons[@"duplicate.trash"] tap];
+    XCTAssertTrue([app.alerts.buttons[@"取消"] waitForExistenceWithTimeout:5]);
+    [app.alerts.buttons[@"取消"] tap];
+    [app terminate];
+}
+
 @end

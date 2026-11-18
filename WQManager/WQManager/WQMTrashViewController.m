@@ -7,6 +7,11 @@
 #import "WQMTrashStore.h"
 #import "WQMTheme.h"
 #import "WQMLanguageManager.h"
+#import "WQAccess.h"
+#import "WQAccessSafety.h"
+
+#import <sys/stat.h>
+#import <unistd.h>
 
 static NSString *WQMTrashBytes(unsigned long long bytes)
 {
@@ -191,8 +196,27 @@ static NSString *WQMTrashBytes(unsigned long long bytes)
 
 - (void)restoreItem:(WQMTrashItem *)item
 {
+    if (item.containerPath.length) {
+        BOOL granted = wq_grant(item.containerPath);
+        int fd = granted ? WQOpenDirectoryNoLinks(item.containerPath) : -1;
+        struct stat st;
+        BOOL same = fd >= 0 && fstat(fd, &st) == 0 &&
+            st.st_dev == item.containerDevice && st.st_ino == item.containerInode &&
+            (!item.bundleIdentifier.length || [wq_container_label(item.containerPath) isEqual:item.bundleIdentifier]);
+        if (fd >= 0) close(fd);
+        int parent = WQOpenDirectoryNoLinks(item.originalPath.stringByDeletingLastPathComponent);
+        same = same && parent >= 0;
+        if (parent >= 0) close(parent);
+        if (!same) {
+            wq_drop_grant(item.containerPath);
+            [self presentMessage:WQML(@"LENS_TRASH_FAILED", @"还原失败")
+                            body:WQML(@"LENS_TRASH_RESTORE_FAILED", @"无法还原这个项目。")];
+            return;
+        }
+    }
     NSError *error = nil;
     BOOL ok = [WQMTrashStore restoreItem:item error:&error];
+    if (item.containerPath.length) wq_drop_grant(item.containerPath);
     [self reloadTrash];
     if (ok) {
         [self presentMessage:WQML(@"LENS_TRASH_RESTORED", @"已还原") body:item.name];

@@ -52,6 +52,8 @@ int main(void)
         NSString *oldImport = WQMMakeDirectory(tempRoot, @"WQMImport-old", 7200);
         NSString *freshImport = WQMMakeDirectory(tempRoot, @"WQMImport-new", 0);
         NSString *oldExport = WQMMakeDirectory(tempRoot, @"WQMExport-old", 7200);
+        NSString *oldDataExport = WQMMakeDirectory(tempRoot, @"WQMDataExport-old", 7200);
+        NSString *freshDataExport = WQMMakeDirectory(tempRoot, @"WQMDataExport-new", 0);
         NSString *unrelated = WQMMakeDirectory(tempRoot, @"unrelated", 7200);
 
         [WQMHousekeeping runWithBackupRoot:backupRoot
@@ -69,6 +71,8 @@ int main(void)
         WQMAssert(![fm fileExistsAtPath:oldImport], @"old import dir should be removed");
         WQMAssert([fm fileExistsAtPath:freshImport], @"fresh import dir should be kept");
         WQMAssert(![fm fileExistsAtPath:oldExport], @"old export dir should be removed");
+        WQMAssert(![fm fileExistsAtPath:oldDataExport], @"old data export dir should be removed");
+        WQMAssert([fm fileExistsAtPath:freshDataExport], @"fresh data export dir should be kept");
         WQMAssert([fm fileExistsAtPath:unrelated], @"unrelated temp content must be kept");
 
         [fm removeItemAtPath:root error:nil];

@@ -21,6 +21,23 @@ int main(void) { @autoreleasepool {
     Check([WQMScanHistory changeForApp:app] == nil, @"reinstall starts a new series");
     for (NSUInteger i = 0; i < 70; i++) { app.dataSize = i; [WQMScanHistory recordApps:@[app] atDate:[NSDate dateWithTimeIntervalSince1970:i + 5]]; }
     Check([WQMScanHistory samplesForApp:app].count == 60, @"history remains bounded");
+    NSArray<NSDictionary *> *totals = [WQMScanHistory totalSamples];
+    Check(totals.count == 60, @"total samples skip empty snapshots");
+    Check([totals.lastObject[@"Bytes"] isEqual:@69], @"total sum uses measured bytes");
+    Check([totals.firstObject[@"Bytes"] isEqual:@10], @"total series stays aligned with retained snapshots");
+
+    NSString *windowRoot = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
+    [WQMScanHistory setStoragePathForTesting:[windowRoot stringByAppendingPathComponent:@"history.plist"]];
+    unsigned long long windowSizes[] = { 100, 110, 120, 130, 140, 150 };
+    NSInteger windowDays[] = { 0, 10, 20, 30, 35, 40 };
+    for (NSUInteger i = 0; i < 6; i++) {
+        app.dataSize = windowSizes[i];
+        [WQMScanHistory recordApps:@[app] atDate:[NSDate dateWithTimeIntervalSince1970:windowDays[i] * 24 * 60 * 60]];
+    }
+    Check([[WQMScanHistory changeForApp:app overDays:7] isEqual:@10], @"seven-day window compares against the first sample inside it");
+    Check([[WQMScanHistory changeForApp:app overDays:30] isEqual:@40], @"thirty-day window uses the same rule");
+    Check([[WQMScanHistory totalSamples].lastObject[@"Bytes"] isEqual:@150], @"total samples follow the current series");
+    [NSFileManager.defaultManager removeItemAtPath:windowRoot error:nil];
     app.sizeKnown = NO;
     Check([WQMScanHistory changeForApp:app] == nil, @"unknown current size never yields a delta");
     [WQMScanHistory recordApps:@[app] atDate:NSDate.date];

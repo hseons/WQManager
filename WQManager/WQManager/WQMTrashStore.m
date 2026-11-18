@@ -13,6 +13,12 @@ static NSString *const kWQMTrashManifestSource = @"Source";
 static NSString *const kWQMTrashManifestCreated = @"Created";
 static NSString *const kWQMTrashManifestItems = @"Items";
 static NSString *const kWQMTrashItemName = @"Name";
+static NSString *const kWQMTrashItemDisplayName = @"DisplayName";
+static NSString *const kWQMTrashItemOriginalPath = @"OriginalPath";
+static NSString *const kWQMTrashItemBundleIdentifier = @"BundleID";
+static NSString *const kWQMTrashItemContainerPath = @"Container";
+static NSString *const kWQMTrashItemContainerDevice = @"ContainerDevice";
+static NSString *const kWQMTrashItemContainerInode = @"ContainerInode";
 static NSString *const kWQMTrashItemBytes = @"Bytes";
 static NSString *const kWQMTrashItemDirectory = @"Directory";
 
@@ -110,12 +116,21 @@ static NSString *const kWQMTrashItemDirectory = @"Directory";
                 NSString *itemName = entry[kWQMTrashItemName];
                 if (![itemName isKindOfClass:NSString.class] || !itemName.length) continue;
                 WQMTrashItem *item = [WQMTrashItem new];
-                item.name = itemName;
+                NSString *displayName = entry[kWQMTrashItemDisplayName];
+                item.name = [displayName isKindOfClass:NSString.class] && displayName.length ? displayName : itemName;
                 item.path = [path stringByAppendingPathComponent:itemName];
                 item.directory = [entry[kWQMTrashItemDirectory] boolValue];
                 item.bytes = [entry[kWQMTrashItemBytes] unsignedLongLongValue];
-                item.originalPath = session.sourcePath
-                    ? [session.sourcePath stringByAppendingPathComponent:itemName] : nil;
+                NSString *original = entry[kWQMTrashItemOriginalPath];
+                item.originalPath = [original isKindOfClass:NSString.class] && original.length
+                    ? original
+                    : session.sourcePath ? [session.sourcePath stringByAppendingPathComponent:itemName] : nil;
+                NSString *bundleIdentifier = entry[kWQMTrashItemBundleIdentifier];
+                NSString *container = entry[kWQMTrashItemContainerPath];
+                item.bundleIdentifier = [bundleIdentifier isKindOfClass:NSString.class] ? bundleIdentifier : nil;
+                item.containerPath = [container isKindOfClass:NSString.class] && container.isAbsolutePath ? container : nil;
+                item.containerDevice = (dev_t)[entry[kWQMTrashItemContainerDevice] unsignedLongLongValue];
+                item.containerInode = (ino_t)[entry[kWQMTrashItemContainerInode] unsignedLongLongValue];
                 if (![manager fileExistsAtPath:item.path]) continue;
                 total += item.bytes;
                 [items addObject:item];

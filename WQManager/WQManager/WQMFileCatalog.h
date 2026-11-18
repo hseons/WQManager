@@ -26,5 +26,11 @@ NS_ASSUME_NONNULL_BEGIN
                                             newer:(WQMFileCatalog *)newer
                                             exact:(BOOL)exact
                                      cancellation:(WQMFileCatalogCancellation *)cancellation;
+/// Returns the SHA-256 of a regular file captured by this catalog. The file is
+/// reopened without links and its identity and timestamps are checked again
+/// after reading; a changed or unreadable file returns nil.
++ (nullable NSData *)digestForEntry:(WQMFileEntry *)entry
+                               root:(NSString *)root
+                       cancellation:(WQMFileCatalogCancellation *)cancellation;
 @end
 NS_ASSUME_NONNULL_END

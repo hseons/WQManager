@@ -18,7 +18,7 @@
 | App Group | `group.mumu.wqmanager` |
 | Scheme | `WQManager` |
 | Deployment target | `26.0` |
-| Marketing version | `0.4` (build `16`, release revision `0.4.4`) |
+| Marketing version | `0.5` (build `1`, release revision `0.5.0`) |
 
 If you fork the project, change the bundle identifiers, the App Group, and the
 entitlements of **both** targets to your own values. The app and the share
@@ -74,6 +74,19 @@ xcodebuild \
 
 The repository does not ship signing material. `dist/` (local IPAs and
 entitlements) is ignored by Git.
+
+## IPA naming
+
+IPA filenames must match the assets on GitHub. Use the marketing version and
+the current build number, not the release tag or a feature suffix:
+
+```text
+WQManager-<marketing>-build<build>-unsigned.ipa
+WQManager-<marketing>-build<build>-dev.ipa
+```
+
+Example for 0.5 build 1: `WQManager-0.5-build1-unsigned.ipa`. Do not use names
+such as `WQManager-0.5.0-beta-dev.ipa`.
 
 ## Tests
 

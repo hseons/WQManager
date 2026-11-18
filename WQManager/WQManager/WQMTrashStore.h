@@ -18,6 +18,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) BOOL directory;
 /// Where the item used to live. Nil for sessions recorded before manifests.
 @property (nonatomic, copy, nullable) NSString *originalPath;
+@property (nonatomic, copy, nullable) NSString *bundleIdentifier;
+@property (nonatomic, copy, nullable) NSString *containerPath;
+@property (nonatomic) dev_t containerDevice;
+@property (nonatomic) ino_t containerInode;
 
 @end
 

@@ -26,19 +26,28 @@ to provide, and where the sharp edges are.
 ## Layers
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│ UI        WQMAppsViewController  WQMCleanerViewController      │
-│           WQMBackupsViewController  WQMHistoryViewController   │
-│           WQMSettingsViewController  WQMCreditsViewController  │
-├───────────────────────────────────────────────────────────────┤
-│ Services  WQMAppScanner  WQMAppIconService  WQMBackupService   │
-│           WQMRestoreService  WQMCacheService                   │
-│           WQMBackupArchiveService  WQMOperationStore           │
-├───────────────────────────────────────────────────────────────┤
-│ Access    WQAccess (container query + sandbox extension token) │
-│           WQAppsSupport (fs helpers, path safety, hashing)     │
-│           WQLaunchServices (display names)                     │
-└───────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ UI       WQMAppsViewController  WQMCleanerViewController       │
+│          WQMBackupsViewController  WQMHistoryViewController    │
+│          WQMSettingsViewController  WQMCreditsViewController   │
+│          WQMSpaceLensViewController                            │
+│          WQMStorageChangesViewController                       │
+│          WQMFileAuditViewController                            │
+│          WQMGlobalFileSearchViewController                     │
+│          WQMExportCenterViewController                         │
+│          WQMDuplicateGroupViewController                       │
+│          WQMFilePreviewViewController  WQMTrashViewController  │
+├────────────────────────────────────────────────────────────────┤
+│ Services WQMAppScanner  WQMAppIconService  WQMBackupService    │
+│          WQMRestoreService  WQMCacheService  WQMScanHistory    │
+│          WQMBackupArchiveService  WQMOperationStore            │
+│          WQMFileCatalog  WQMFileAudit  WQMTrashStore           │
+│          WQMHousekeeping                                       │
+├────────────────────────────────────────────────────────────────┤
+│ Access   WQAccess (container query + sandbox extension)        │
+│          WQAppsSupport (fs helpers, path safety, hashing)      │
+│          WQLaunchServices (display names)                      │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 The app is Objective-C, iOS 26.0 deployment target, with a small share
@@ -312,13 +321,42 @@ service detects the shared grey placeholder, discards it, and for App Store apps
 fetches public artwork from `https://itunes.apple.com/lookup?bundleId=...`.
 Results are cached in memory and on disk (`Caches/WQManager/AppIcons-v6`).
 
+## File catalog, search and export (0.5.0)
+
+`WQMFileCatalog` walks one container at a time with a cancellation token and
+hard bounds (50,000 files / 100,000 entries / 64 levels). It skips symlinks and
+special files, records device/inode/size/mtime/ctime for identity checks, and
+can include or exclude `Library/Caches` and `tmp`. A scan is always tied to a
+short-lived container grant; the grant is dropped after the catalog is built.
+
+`WQMFileAudit` turns catalogs into `WQMAuditFile` snapshots and provides the
+shared pure helpers: large-file ranking, duplicate size buckets, SHA-256
+confirmation and the search predicate/sort used by global search. Duplicate
+groups are keyed by bundle identifier and content digest, so an identical file
+in another app is never presented as a replacement. The cleanup screen requires
+at least one unselected copy per app and moves files through `WQMTrashStore`.
+
+Global search scans apps serially on a utility queue and streams each app's
+results to the main table. Filtering/sorting runs on the accumulated snapshot
+only, with a 300-row display cap; there is no persistent cross-app index.
+
+Export uses a staging tree named `WQMDataExport-<timestamp>`. Every selected
+file is checked against its catalog identity before copying, the free-space
+guard keeps 256 MiB headroom, and the result is offered through the share sheet
+or `UIDocumentPickerViewController`. Operation history is updated only when the
+destination completes or the user cancels; `WQMHousekeeping` removes abandoned
+staging trees.
+
 ## Operation history
 
 `WQMOperationStore` persists an array in `Operations.plist` inside the app
 container. Each record has kind, status, app name, bundle ID, byte count,
 timestamps, backup path and an optional error message. The history UI groups
 records by day and kind; a group of two or more collapses into one card with a
-count, total and latest time.
+count, total and latest time. A record still marked Running when the store is
+loaded from disk is converted to Interrupted with a finish time and an
+explanatory message, so a crash or force-quit never leaves a permanent spinner
+in history.
 
 ## Localization and theming
 

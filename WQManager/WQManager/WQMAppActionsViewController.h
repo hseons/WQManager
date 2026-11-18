@@ -12,6 +12,7 @@ typedef NS_ENUM(NSInteger, WQMAppAction) {
     WQMAppActionCopyBundleID,
     WQMAppActionFindFiles,
     WQMAppActionCustomBackup,
+    WQMAppActionExportCenter,
     WQMAppActionRefresh,
     WQMAppActionDiagnose,
 };

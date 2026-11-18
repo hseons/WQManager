@@ -84,6 +84,31 @@ int main(void)
         WQMAssert([file.originalPath isEqualToString:[level stringByAppendingPathComponent:@"chat.db"]],
                   @"original path reconstructed");
 
+        NSString *crossSession = [WQMTrashStore createSessionForLevel:@"cross-app"];
+        NSString *storedName = @"001-cross-app-copy.jpg";
+        NSString *crossPath = [crossSession stringByAppendingPathComponent:storedName];
+        WQMWriteFile(crossSession, storedName, 3072);
+        NSString *crossOriginal = [container stringByAppendingPathComponent:@"Documents/copy.jpg"];
+        [WQMTrashStore recordSession:crossSession source:@"重复文件清理" items:@[@{
+            @"Name": storedName, @"DisplayName": @"copy.jpg", @"OriginalPath": crossOriginal,
+            @"BundleID": @"example.fixture", @"Container": container,
+            @"ContainerDevice": @11, @"ContainerInode": @22,
+            @"Bytes": @3072, @"Directory": @NO,
+        }]];
+        BOOL sawCross = NO;
+        for (WQMTrashSession *candidate in [WQMTrashStore sessions]) {
+            if (![candidate.name containsString:@"cross-app"]) continue;
+            sawCross = YES;
+            WQMTrashItem *item = candidate.items.firstObject;
+            WQMAssert([item.name isEqualToString:@"copy.jpg"], @"display name is separate from stored name");
+            WQMAssert([item.path isEqualToString:crossPath], @"stored path uses unique name");
+            WQMAssert([item.originalPath isEqualToString:crossOriginal], @"explicit original path is kept");
+            WQMAssert([item.bundleIdentifier isEqualToString:@"example.fixture"], @"bundle id is kept");
+            WQMAssert([item.containerPath isEqualToString:container], @"container path is kept");
+            WQMAssert(item.containerDevice == 11 && item.containerInode == 22, @"container identity is kept");
+        }
+        WQMAssert(sawCross, @"cross-app trash session listed");
+
         NSError *error = nil;
         WQMAssert([WQMTrashStore restoreItem:file error:&error], @"restore succeeds");
         WQMAssert([[NSFileManager defaultManager] fileExistsAtPath:file.originalPath], @"file back home");
@@ -111,7 +136,7 @@ int main(void)
         [WQMTrashStore removeItem:remaining];
         WQMAssert(![[NSFileManager defaultManager] fileExistsAtPath:remaining.path], @"item removed from bin");
 
-        WQMAssert(WQMTrashStore.totalBytes == 1024, @"legacy bytes still counted");
+        WQMAssert(WQMTrashStore.totalBytes == 4096, @"legacy and cross-app bytes still counted");
         [WQMTrashStore emptyAll];
         WQMAssert([WQMTrashStore sessions].count == 0, @"bin emptied");
         WQMAssert([WQMTrashStore totalBytes] == 0, @"no bytes left");

@@ -4,6 +4,50 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning once it reaches 1.0.
 
+## [0.5.0] — 2026-11-18
+
+The app and share extension display version **0.5**, build **1**. The internal
+release revision and Git tag are 0.5.0 / v0.5.0.
+
+### Added
+
+- Global file search across accessible apps: streamed scan results, file
+  name/relative path/app name matching, type and minimum-size filters,
+  path/size/newest sorting, in-place previews and jump-to-containing-folder.
+- Space changes can compare the previous scan or the last 7/30 days, with a
+  growth ranking, known-total/net-change footer and an all-app trend chart.
+  Per-app detail shows current size, previous-scan change and 7-day change.
+- Large-file and duplicate audit with SHA-256 confirmation and per-app
+  duplicate groups. Cleanup keeps at least one copy per app and moves files to
+  the Space Lens bin.
+- Export center: choose files across apps, filter by type, then share the
+  staged folder or save it through the system document picker. Export history
+  is recorded only after the destination completes or the user cancels.
+- Space Lens bin entries can be restored to their original folder, removed
+  individually, or emptied together.
+
+### Changed
+
+- The Apps tools menu now exposes storage changes, batch backup, file audit and
+  global search in one place.
+- Duplicate buckets are grouped by app and size; a duplicate in another app is
+  never treated as a replacement. The cleanup screen refuses to select the last
+  remaining copy of an app.
+- Export staging is cleaned on cancel, failure, a missing window or share
+  completion; abandoned `WQMDataExport-*` trees are removed by housekeeping.
+- History shows a record left Running by a previous process as Interrupted
+  instead of a permanent in-progress state.
+
+### Fixed
+
+- Static-analyzer warnings in `wq_drop_grant` (NSNumber pointer used as a
+  boolean) and the Space Lens path list (`nil` name passed to `addObject:`).
+- Space changes ranking footers no longer sit under the floating tab bar.
+- Export history no longer records success merely because the share sheet was
+  presented.
+- Unused localization keys were removed; English and Simplified Chinese remain
+  at parity.
+
 ## [0.4.4] — 2026-11-16
 
 The app and share extension display version **0.4**, build **16**. The internal

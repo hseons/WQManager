@@ -29,6 +29,10 @@
 > [SAFETY.md](SAFETY.md) and [DISCLAIMER.md](DISCLAIMER.md) before using it on a
 > device that holds data you care about.
 
+> Found a problem or have an idea? Please
+> [open an issue](https://github.com/hseons/WQManager/issues) — feedback is
+> welcome and helps make the app safer for everyone.
+
 ## What it does
 
 WQManager is built around three workflows:
@@ -118,6 +122,33 @@ Everything is local. No account, no analytics, no cloud.
 - Deletions land in a bin (Settings → Data) that can restore items to their
   original folder, remove them, or empty everything.
 
+### File tools
+
+- Large-file and duplicate audit across accessible apps, with type filters,
+  SHA-256 verification and per-app duplicate groups. Duplicate cleanup keeps at
+  least one copy per app and moves files to the Space Lens bin instead of
+  deleting them outright.
+- Export center: select files from any app, filter by type, then share the
+  staged folder or save it through the system document picker. An export is
+  only marked complete after the destination finishes; cancelling removes the
+  staging tree.
+- Global file search: search user files across every accessible app by file
+  name, relative path or app name while results stream in. Filter by type and
+  minimum size, sort by path/size/newest, preview in place or jump to the
+  containing folder.
+- File tools share a bounded catalog (50,000 files / 100,000 entries per app)
+  and exclude `Library/Caches` and `tmp` unless a screen explicitly includes
+  them.
+
+### Space changes
+
+- Rank apps by growth over the previous scan or the last 7/30 days, with a
+  total occupied/net change footer and an all-app trend chart.
+- Per-app detail shows current size, change since the previous scan and change
+  over the last 7 days, plus the retained snapshot history.
+- History keeps at most 60 snapshots; a changed container or a missing
+  measurement starts a new series. Growth is not reclaimable space.
+
 ### History
 
 - Every backup, export, import, restore, rollback, cleanup and failure is
@@ -131,6 +162,20 @@ Everything is local. No account, no analytics, no cloud.
 - Chinese (Simplified) and English, switchable in Settings.
 - Light, high-contrast, large-type-friendly layout with Dynamic Type support.
 - Legal gate, safety documentation and third-party credits built in.
+
+## New in 0.5.0
+
+- Global file search across accessible apps, with streaming results, type and
+  size filters, path/size/newest sorting, previews and jump-to-folder.
+- Storage changes now compare the previous scan or the last 7/30 days, add an
+  all-app trend chart and a net-change summary, and keep the per-app history.
+- File audit and export center: large-file and duplicate review, SHA-256
+  duplicate confirmation per app, keep-one-per-app cleanup, and exports that
+  can be shared or saved to Files and are recorded only after completion.
+- Safety and consistency fixes: cross-app duplicate groups no longer imply a
+  safe replacement, duplicate cleanup never selects the last copy in an app,
+  export staging is cleaned on cancel/failure, and interrupted operations are
+  shown as interrupted after relaunch.
 
 ## New workflows in 0.4.0
 
@@ -205,8 +250,8 @@ cache; diagnostics do not write to the target app or start a full-disk scan.
 The share button exports a local JSON report with environment evidence, failure
 stages and numeric error codes, excluding app names, bundle IDs, paths, tokens,
 raw logs and file contents. Simulator and synthetic samples are explicitly
-marked. The displayed version stays 0.4 with an increasing build number; release
-revisions remain available for tags and update checks.
+marked. The displayed version is 0.5, build 1; release revisions remain
+available for tags and update checks.
 
 ## Icons on stock iOS
 

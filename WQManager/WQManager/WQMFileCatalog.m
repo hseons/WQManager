@@ -127,6 +127,11 @@ static NSData *WQMCatalogDigest(NSString *root, WQMFileEntry *entry, WQMFileCata
     }
     return matched;
 }
++ (NSData *)digestForEntry:(WQMFileEntry *)entry root:(NSString *)root
+              cancellation:(WQMFileCatalogCancellation *)cancellation
+{
+    return WQMCatalogDigest(root, entry, cancellation);
+}
 + (NSArray<NSDictionary *> *)compareOlder:(WQMFileCatalog *)older newer:(WQMFileCatalog *)newer
                                     exact:(BOOL)exact cancellation:(WQMFileCatalogCancellation *)cancellation
 {

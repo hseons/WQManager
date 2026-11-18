@@ -372,7 +372,7 @@ void wq_drop_grant(NSString *path)
     NSString *key = wq_norm(path);
     [gGrantLock lock];
     NSNumber *handle = gGrants[key];
-    if (handle) {
+    if (handle != nil) {
         wq_release_handle(handle.longLongValue);
         [gGrants removeObjectForKey:key];
         [gGrantOrder removeObject:key];

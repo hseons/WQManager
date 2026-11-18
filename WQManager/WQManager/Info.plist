@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>WQMReleaseVersion</key>
-    <string>0.4.4</string>
+    <string>0.5.0</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh-Hans</string>
 	<key>CFBundleDisplayName</key>

@@ -1273,7 +1273,9 @@ typedef NS_ENUM(NSInteger, WQMLensSortOrder) {
     }
     NSDictionary *child = [self rows][(NSUInteger)indexPath.row];
     NSString *name = child[WQChildNameKey];
-    NSString *path = [[self currentPath] stringByAppendingPathComponent:name ?: @""];
+    // An entry without a name cannot be opened or appended to the path stack.
+    if (!name.length) return;
+    NSString *path = [[self currentPath] stringByAppendingPathComponent:name];
     if ([child[WQChildIsDirectoryKey] boolValue]) {
         [_titles addObject:name];
         [_paths addObject:path];

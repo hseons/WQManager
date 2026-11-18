@@ -21,6 +21,17 @@ if not path.exists():
 with (root / 'inspection.plist').open('wb') as file:
     plistlib.dump({'nested': {'theme': 'dark', 'enabled': True}, 'items': ['one', 'two']}, file, fmt=plistlib.FMT_BINARY)
 (root / 'large.txt').write_text(('Synthetic preview line\n' * 100000), encoding='utf-8')
+export_root = root / 'Export Fixture'
+export_root.mkdir(parents=True, exist_ok=True)
+for name, size in (('voice.m4a', 1024 * 1024), ('report.pdf', 1024 * 1024), ('archive.zip', 1024 * 1024)):
+    path = export_root / name
+    if not path.exists():
+        path.write_bytes(b'\0' * size)
+duplicate = b'duplicate-fixture-content' * 80000
+for name in ('duplicate-a.jpg', 'duplicate-b.jpg'):
+    path = export_root / name
+    if not path.exists():
+        path.write_bytes(duplicate)
 print('Prepared synthetic plist, SQLite and large-text UI fixtures')
 
 # Stream a high-resolution PNG without retaining an uncompressed image in RAM.

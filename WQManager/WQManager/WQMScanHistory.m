@@ -25,6 +25,24 @@ static NSArray<NSDictionary *> *gWQMSnapshots;
     gWQMSnapshots = result.count > 60 ? [result subarrayWithRange:NSMakeRange(result.count - 60, 60)] : [result copy];
     return gWQMSnapshots;
 }
++ (NSArray<NSDictionary *> *)totalSamples
+{
+    @synchronized(self) {
+        NSMutableArray *samples = [NSMutableArray new];
+        for (NSDictionary *snapshot in self.snapshots) {
+            unsigned long long total = 0;
+            NSUInteger measured = 0;
+            for (id entry in [snapshot[@"Apps"] allValues]) {
+                if (![entry isKindOfClass:NSDictionary.class] || ![entry[@"Bytes"] isKindOfClass:NSNumber.class]) continue;
+                total += [entry[@"Bytes"] unsignedLongLongValue];
+                measured++;
+            }
+            if (!measured) continue;
+            [samples addObject:@{@"Date": snapshot[@"Date"], @"Bytes": @(total), @"AppCount": @(measured)}];
+        }
+        return samples;
+    }
+}
 + (void)recordApps:(NSArray<WQMAppModel *> *)apps atDate:(NSDate *)date
 {
     @synchronized(self) {
@@ -68,6 +86,26 @@ static NSArray<NSDictionary *> *gWQMSnapshots;
     NSArray *samples = [self samplesForApp:app];
     if (samples.count < 2) return nil;
     unsigned long long before = [samples[samples.count - 2][@"Bytes"] unsignedLongLongValue];
+    unsigned long long after = [samples.lastObject[@"Bytes"] unsignedLongLongValue];
+    if (before > LLONG_MAX || after > LLONG_MAX) return nil;
+    return @((long long)after - (long long)before);
+}
++ (NSNumber *)changeForApp:(WQMAppModel *)app overDays:(NSInteger)days
+{
+    if (days <= 0) return [self changeForApp:app];
+    if (!app.sizeKnown || !app.identityKnown || !app.accessAvailable) return nil;
+    NSArray<NSDictionary *> *samples = [self samplesForApp:app];
+    if (samples.count < 2) return nil;
+    NSDate *latestDate = samples.lastObject[@"Date"];
+    NSDate *cutoff = [latestDate dateByAddingTimeInterval:-(NSTimeInterval)days * 24 * 60 * 60];
+    NSUInteger baselineIndex = 0;
+    while (baselineIndex < samples.count &&
+           [samples[baselineIndex][@"Date"] compare:cutoff] == NSOrderedAscending) {
+        baselineIndex++;
+    }
+    // Only the newest sample falls inside the window: there is nothing to compare.
+    if (baselineIndex >= samples.count - 1) return nil;
+    unsigned long long before = [samples[baselineIndex][@"Bytes"] unsignedLongLongValue];
     unsigned long long after = [samples.lastObject[@"Bytes"] unsignedLongLongValue];
     if (before > LLONG_MAX || after > LLONG_MAX) return nil;
     return @((long long)after - (long long)before);

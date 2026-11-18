@@ -2,6 +2,9 @@
 #import "WQMBackupQueueViewController.h"
 #import "WQMBackupSelectionViewController.h"
 #import "WQMFilesViewController.h"
+#import "WQMExportCenterViewController.h"
+#import "WQMFileAuditViewController.h"
+#import "WQMGlobalFileSearchViewController.h"
 #import "WQMAppsViewController.h"
 #import "WQMAppModel.h"
 #import "WQMAppScanner.h"
@@ -542,6 +545,9 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
         else if ([feature isEqual:@"trend"]) [self.navigationController pushViewController:[[WQMStorageChangesViewController alloc] initWithApp:app] animated:NO];
         else if ([feature isEqual:@"batch"]) [self showBackupQueue];
         else if ([feature isEqual:@"files"]) [self.navigationController pushViewController:[[WQMFilesViewController alloc] initWithApp:app] animated:NO];
+        else if ([feature isEqual:@"export"]) [self.navigationController pushViewController:[[WQMExportCenterViewController alloc] initWithApp:app] animated:NO];
+        else if ([feature isEqual:@"audit"]) [self showFileAudit];
+        else if ([feature isEqual:@"search"]) [self showGlobalSearch];
         else if ([feature isEqual:@"selection"]) [self.navigationController pushViewController:[[WQMBackupSelectionViewController alloc] initWithApp:app completion:^(WQMBackupScopeDescriptor *selection) {}] animated:NO];
         else if ([feature isEqual:@"backup"] || [feature isEqual:@"compare"]) {
             NSArray *records = [WQMBackupStore allBackups];
@@ -858,6 +864,8 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     UIMenu *tools = [UIMenu menuWithChildren:@[
         [UIAction actionWithTitle:WQML(@"SPACE_CHANGES", @"空间变化") image:[UIImage systemImageNamed:@"chart.line.uptrend.xyaxis"] identifier:nil handler:^(UIAction *action) { [weakSelf showStorageChanges]; }],
         [UIAction actionWithTitle:WQML(@"BATCH_BACKUP", @"批量备份") image:[UIImage systemImageNamed:@"square.stack.3d.up"] identifier:nil handler:^(UIAction *action) { [weakSelf showBackupQueue]; }],
+        [UIAction actionWithTitle:WQML(@"AUDIT_TOOL_TITLE", @"大文件与重复文件") image:[UIImage systemImageNamed:@"doc.on.doc"] identifier:nil handler:^(UIAction *action) { [weakSelf showFileAudit]; }],
+        [UIAction actionWithTitle:WQML(@"GLOBAL_SEARCH_TITLE", @"全局文件搜索") image:[UIImage systemImageNamed:@"magnifyingglass"] identifier:nil handler:^(UIAction *action) { [weakSelf showGlobalSearch]; }],
     ]];
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"ellipsis.circle"] menu:tools];
     self.navigationItem.leftBarButtonItem.accessibilityLabel = WQML(@"APP_TOOLS", @"应用工具");
@@ -1081,6 +1089,10 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
             [self.navigationController pushViewController:[[WQMFilesViewController alloc] initWithApp:app] animated:YES];
             return;
         }
+        if (action == WQMAppActionExportCenter) {
+            [self.navigationController pushViewController:[[WQMExportCenterViewController alloc] initWithApp:app] animated:YES];
+            return;
+        }
         if (action == WQMAppActionCustomBackup) {
             __weak typeof(self) weakSelf = self;
             WQMBackupSelectionViewController *picker = [[WQMBackupSelectionViewController alloc] initWithApp:app completion:^(WQMBackupScopeDescriptor *selection) {
@@ -1127,6 +1139,16 @@ static WQMAppSizeFilter WQMAppSizeFilterForModel(WQMAppModel *app)
     if (!_batchController) _batchController = [[WQMBackupQueueViewController alloc] initWithApps:_apps];
     else [_batchController updateApps:_apps];
     [self.navigationController pushViewController:_batchController animated:YES];
+}
+
+- (void)showFileAudit
+{
+    [self.navigationController pushViewController:[[WQMFileAuditViewController alloc] initWithApps:_apps] animated:YES];
+}
+
+- (void)showGlobalSearch
+{
+    [self.navigationController pushViewController:[[WQMGlobalFileSearchViewController alloc] initWithApps:_apps] animated:YES];
 }
 
 - (void)showSpaceLensForApp:(WQMAppModel *)app

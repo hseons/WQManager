@@ -206,6 +206,11 @@ clang -fobjc-arc -fblocks -I"$SOURCE_DIR" -framework Foundation \
 "$OUTPUT_DIR/WQMFileCatalogTests"
 
 clang -fobjc-arc -fblocks -I"$SOURCE_DIR" -framework Foundation \
+  "$SOURCE_DIR/WQMFileCatalog.m" "$SOURCE_DIR/WQMFileAudit.m" \
+  "$ROOT/tests/WQMFileAuditTests.m" -o "$OUTPUT_DIR/WQMFileAuditTests"
+"$OUTPUT_DIR/WQMFileAuditTests"
+
+clang -fobjc-arc -fblocks -I"$SOURCE_DIR" -framework Foundation \
   "$SOURCE_DIR/WQMLanguageManager.m" "$SOURCE_DIR/WQMAppModel.m" \
   "$SOURCE_DIR/WQMBackupSelection.m" "$SOURCE_DIR/WQMBackupQueue.m" \
   "$ROOT/tests/WQMBackupQueueTests.m" -o "$OUTPUT_DIR/WQMBackupQueueTests"
